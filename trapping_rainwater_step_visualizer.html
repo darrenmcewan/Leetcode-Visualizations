@@ -1,0 +1,1158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Trapping Rain Water — Step-by-Step Visualizer</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --panel: #111827;
+      --panel-soft: #1f2937;
+      --panel-softer: #253041;
+      --text: #e5e7eb;
+      --muted: #94a3b8;
+      --accent: #38bdf8;
+      --accent-2: #a78bfa;
+      --good: #34d399;
+      --warn: #fbbf24;
+      --danger: #fb7185;
+      --bar: #f8fafc;
+      --bar-edge: #cbd5e1;
+      --water: rgba(56, 189, 248, 0.72);
+      --water-edge: rgba(14, 165, 233, 0.95);
+      --shadow: 0 24px 70px rgba(0, 0, 0, 0.32);
+      --radius: 20px;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background:
+        radial-gradient(circle at top left, rgba(56, 189, 248, 0.18), transparent 34rem),
+        radial-gradient(circle at 82% 14%, rgba(167, 139, 250, 0.16), transparent 28rem),
+        var(--bg);
+      color: var(--text);
+    }
+
+    header {
+      padding: 32px clamp(18px, 4vw, 48px) 12px;
+    }
+
+    h1 {
+      margin: 0 0 10px;
+      font-size: clamp(2rem, 4vw, 3.7rem);
+      letter-spacing: -0.055em;
+      line-height: 0.95;
+    }
+
+    .subtitle {
+      max-width: 900px;
+      margin: 0;
+      color: var(--muted);
+      font-size: 1.02rem;
+      line-height: 1.65;
+    }
+
+    .app {
+      display: grid;
+      grid-template-columns: minmax(0, 1.18fr) minmax(360px, 0.82fr);
+      gap: 22px;
+      padding: 18px clamp(18px, 4vw, 48px) 42px;
+    }
+
+    .card {
+      background: linear-gradient(180deg, rgba(17, 24, 39, 0.92), rgba(17, 24, 39, 0.84));
+      border: 1px solid rgba(148, 163, 184, 0.18);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    .card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      padding: 18px 20px;
+      border-bottom: 1px solid rgba(148, 163, 184, 0.14);
+      background: rgba(15, 23, 42, 0.5);
+    }
+
+    .card-title {
+      margin: 0;
+      font-size: 0.92rem;
+      color: #cbd5e1;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      font-weight: 800;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      border: 1px solid rgba(148, 163, 184, 0.18);
+      border-radius: 999px;
+      color: #dbeafe;
+      background: rgba(30, 41, 59, 0.72);
+      padding: 8px 11px;
+      font-size: 0.84rem;
+      white-space: nowrap;
+    }
+
+    .visual-card {
+      display: flex;
+      flex-direction: column;
+      min-height: 620px;
+    }
+
+    .visual-body {
+      padding: 20px;
+      display: grid;
+      gap: 18px;
+    }
+
+    .array-input-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 10px;
+    }
+
+    label {
+      display: block;
+      color: #cbd5e1;
+      font-size: 0.88rem;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+
+    input[type="text"] {
+      width: 100%;
+      border: 1px solid rgba(148, 163, 184, 0.24);
+      color: var(--text);
+      background: rgba(15, 23, 42, 0.62);
+      border-radius: 14px;
+      padding: 13px 14px;
+      font: 600 0.95rem ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      outline: none;
+      transition: border 160ms ease, box-shadow 160ms ease;
+    }
+
+    input[type="text"]:focus {
+      border-color: rgba(56, 189, 248, 0.78);
+      box-shadow: 0 0 0 4px rgba(56, 189, 248, 0.13);
+    }
+
+    .error {
+      min-height: 20px;
+      margin-top: 7px;
+      color: #fecdd3;
+      font-size: 0.88rem;
+    }
+
+    .chart-wrap {
+      position: relative;
+      min-height: 360px;
+      border-radius: 18px;
+      border: 1px solid rgba(148, 163, 184, 0.18);
+      background:
+        linear-gradient(rgba(148, 163, 184, 0.08) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(148, 163, 184, 0.05) 1px, transparent 1px),
+        rgba(15, 23, 42, 0.52);
+      background-size: 100% 64px, 64px 100%;
+      padding: 42px 16px 52px;
+      overflow: hidden;
+    }
+
+    .bars {
+      height: 260px;
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+      gap: clamp(6px, 1.25vw, 14px);
+    }
+
+    .column {
+      position: relative;
+      height: 260px;
+      flex: 1 1 0;
+      max-width: 58px;
+      min-width: 26px;
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+    }
+
+    .stack {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      border-radius: 12px 12px 6px 6px;
+    }
+
+    .bar,
+    .water {
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      border-radius: 9px 9px 4px 4px;
+      transition: height 360ms ease, bottom 360ms ease, opacity 260ms ease, transform 260ms ease;
+    }
+
+    .bar {
+      min-height: 2px;
+      background: linear-gradient(180deg, var(--bar), var(--bar-edge));
+      box-shadow: inset 0 -8px 18px rgba(15, 23, 42, 0.18);
+      z-index: 2;
+    }
+
+    .water {
+      background:
+        linear-gradient(180deg, rgba(186, 230, 253, 0.72), var(--water)),
+        repeating-linear-gradient(135deg, rgba(255, 255, 255, 0.18) 0 6px, transparent 6px 12px);
+      border: 1px solid var(--water-edge);
+      z-index: 1;
+      opacity: 0;
+    }
+
+    .water.has-water {
+      opacity: 1;
+      animation: ripple 1.8s linear infinite;
+    }
+
+    @keyframes ripple {
+      from { background-position: 0 0, 0 0; }
+      to { background-position: 0 0, 24px 0; }
+    }
+
+    .column.active .stack {
+      filter: drop-shadow(0 0 16px rgba(251, 191, 36, 0.45));
+    }
+
+    .column.pointer-left .bar,
+    .column.pointer-right .bar {
+      outline: 3px solid rgba(56, 189, 248, 0.42);
+      outline-offset: 3px;
+    }
+
+    .column.pointer-right .bar {
+      outline-color: rgba(167, 139, 250, 0.48);
+    }
+
+    .pointer-badges {
+      position: absolute;
+      inset-inline: 0;
+      top: -34px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      z-index: 5;
+      pointer-events: none;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 28px;
+      height: 26px;
+      padding: 0 8px;
+      border-radius: 999px;
+      color: #082f49;
+      background: #7dd3fc;
+      font-size: 0.76rem;
+      font-weight: 900;
+      box-shadow: 0 10px 22px rgba(8, 47, 73, 0.28);
+    }
+
+    .badge.right {
+      color: #2e1065;
+      background: #c4b5fd;
+    }
+
+    .index-label,
+    .height-label,
+    .water-label {
+      position: absolute;
+      left: 50%;
+      transform: translateX(-50%);
+      font: 800 0.74rem ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      text-align: center;
+      white-space: nowrap;
+    }
+
+    .index-label {
+      bottom: -34px;
+      color: #cbd5e1;
+    }
+
+    .height-label {
+      bottom: var(--label-bottom, 6px);
+      color: #0f172a;
+      z-index: 4;
+      text-shadow: 0 1px rgba(255,255,255,0.25);
+    }
+
+    .water-label {
+      bottom: var(--water-label-bottom, 20px);
+      color: #e0f2fe;
+      z-index: 5;
+      background: rgba(3, 105, 161, 0.82);
+      border: 1px solid rgba(186, 230, 253, 0.5);
+      padding: 2px 6px;
+      border-radius: 999px;
+      opacity: 0;
+      transition: opacity 220ms ease;
+    }
+
+    .water-label.visible {
+      opacity: 1;
+    }
+
+    .baseline {
+      position: absolute;
+      left: 16px;
+      right: 16px;
+      bottom: 52px;
+      border-top: 2px solid rgba(148, 163, 184, 0.32);
+    }
+
+    .max-line {
+      position: absolute;
+      left: 16px;
+      right: 16px;
+      height: 0;
+      border-top: 2px dashed rgba(56, 189, 248, 0.7);
+      bottom: calc(52px + var(--max-y));
+      opacity: 0.92;
+      transition: bottom 360ms ease;
+    }
+
+    .max-line.right {
+      border-top-color: rgba(167, 139, 250, 0.75);
+    }
+
+    .max-tag {
+      position: absolute;
+      right: 10px;
+      top: -13px;
+      background: rgba(3, 105, 161, 0.95);
+      border: 1px solid rgba(186, 230, 253, 0.45);
+      color: #e0f2fe;
+      padding: 3px 8px;
+      border-radius: 999px;
+      font: 800 0.75rem ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    }
+
+    .max-line.right .max-tag {
+      right: auto;
+      left: 10px;
+      background: rgba(91, 33, 182, 0.94);
+    }
+
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 10px;
+      padding: 14px;
+      border-radius: 18px;
+      background: rgba(15, 23, 42, 0.48);
+      border: 1px solid rgba(148, 163, 184, 0.14);
+    }
+
+    button {
+      border: 0;
+      border-radius: 13px;
+      padding: 11px 14px;
+      color: #f8fafc;
+      background: var(--panel-soft);
+      font-weight: 850;
+      letter-spacing: -0.01em;
+      cursor: pointer;
+      transition: transform 120ms ease, background 160ms ease, opacity 160ms ease;
+    }
+
+    button:hover:not(:disabled) {
+      transform: translateY(-1px);
+      background: #334155;
+    }
+
+    button:active:not(:disabled) {
+      transform: translateY(0);
+    }
+
+    button.primary {
+      color: #04111d;
+      background: linear-gradient(180deg, #7dd3fc, #38bdf8);
+    }
+
+    button.primary:hover:not(:disabled) {
+      background: linear-gradient(180deg, #bae6fd, #38bdf8);
+    }
+
+    button:disabled {
+      cursor: not-allowed;
+      opacity: 0.45;
+    }
+
+    .speed-wrap {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-left: auto;
+      color: var(--muted);
+      font-weight: 700;
+      font-size: 0.86rem;
+    }
+
+    input[type="range"] {
+      accent-color: var(--accent);
+      max-width: 140px;
+    }
+
+    .step-progress {
+      padding: 0 2px;
+      color: var(--muted);
+      font-weight: 800;
+      font-size: 0.9rem;
+    }
+
+    .side {
+      display: grid;
+      gap: 22px;
+      align-content: start;
+    }
+
+    .code-card {
+      overflow: hidden;
+    }
+
+    .code {
+      margin: 0;
+      padding: 12px 0;
+      background: rgba(2, 6, 23, 0.46);
+      overflow: auto;
+      max-height: 520px;
+      font: 0.91rem/1.62 ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+    }
+
+    .code-line {
+      display: grid;
+      grid-template-columns: 3.2ch minmax(0, 1fr);
+      gap: 12px;
+      padding: 1px 18px;
+      border-left: 4px solid transparent;
+      color: #cbd5e1;
+      min-width: max-content;
+      transition: background 180ms ease, color 180ms ease, border-color 180ms ease;
+    }
+
+    .code-line .line-number {
+      color: #64748b;
+      text-align: right;
+      user-select: none;
+    }
+
+    .code-line.active {
+      background: linear-gradient(90deg, rgba(56, 189, 248, 0.22), rgba(56, 189, 248, 0.05));
+      border-left-color: var(--accent);
+      color: #ffffff;
+    }
+
+    .code-line.active .line-number {
+      color: #bae6fd;
+    }
+
+    .state-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+      padding: 18px;
+    }
+
+    .state-item {
+      padding: 14px;
+      border-radius: 16px;
+      background: rgba(15, 23, 42, 0.54);
+      border: 1px solid rgba(148, 163, 184, 0.14);
+    }
+
+    .state-label {
+      color: var(--muted);
+      font-size: 0.76rem;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      font-weight: 850;
+    }
+
+    .state-value {
+      margin-top: 6px;
+      font: 900 1.24rem ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    }
+
+    .state-value.good {
+      color: var(--good);
+    }
+
+    .explain {
+      padding: 18px;
+    }
+
+    .explain h2 {
+      margin: 0 0 9px;
+      font-size: 1.22rem;
+      letter-spacing: -0.025em;
+    }
+
+    .explain p {
+      margin: 0;
+      color: #cbd5e1;
+      line-height: 1.64;
+    }
+
+    .rule {
+      margin-top: 14px;
+      border-radius: 16px;
+      padding: 14px;
+      color: #dbeafe;
+      background: rgba(56, 189, 248, 0.10);
+      border: 1px solid rgba(56, 189, 248, 0.20);
+      line-height: 1.55;
+      font-size: 0.94rem;
+    }
+
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      color: #cbd5e1;
+      font-size: 0.86rem;
+      padding: 0 2px;
+    }
+
+    .legend-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+    }
+
+    .swatch {
+      width: 14px;
+      height: 14px;
+      border-radius: 4px;
+      display: inline-block;
+      border: 1px solid rgba(255,255,255,0.24);
+    }
+
+    .swatch.bar-swatch { background: linear-gradient(180deg, var(--bar), var(--bar-edge)); }
+    .swatch.water-swatch { background: var(--water); }
+    .swatch.left-swatch { background: #7dd3fc; }
+    .swatch.right-swatch { background: #c4b5fd; }
+
+    .ledger {
+      padding: 0 18px 18px;
+      overflow: auto;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 320px;
+      font-size: 0.88rem;
+    }
+
+    th, td {
+      padding: 9px 8px;
+      border-bottom: 1px solid rgba(148, 163, 184, 0.13);
+      text-align: left;
+    }
+
+    th {
+      color: var(--muted);
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+    }
+
+    td {
+      color: #dbeafe;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    }
+
+    .active-row td {
+      background: rgba(251, 191, 36, 0.12);
+      color: #fef3c7;
+    }
+
+    @media (max-width: 980px) {
+      .app {
+        grid-template-columns: 1fr;
+      }
+      .visual-card {
+        min-height: unset;
+      }
+    }
+
+    @media (max-width: 640px) {
+      .array-input-row {
+        grid-template-columns: 1fr;
+      }
+      .speed-wrap {
+        width: 100%;
+        margin-left: 0;
+      }
+      input[type="range"] {
+        flex: 1;
+        max-width: none;
+      }
+      .state-grid {
+        grid-template-columns: 1fr;
+      }
+      .chart-wrap {
+        padding-left: 10px;
+        padding-right: 10px;
+      }
+      .bars {
+        gap: 5px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Trapping Rain Water Visualizer</h1>
+    <p class="subtitle">
+      Step through the two-pointer solution. The lower boundary determines which pointer moves, because the trapped water on that side is already bounded by its own max wall.
+    </p>
+  </header>
+
+  <main class="app">
+    <section class="card visual-card" aria-label="Interactive visualization">
+      <div class="card-header">
+        <h2 class="card-title">Array and pointer movement</h2>
+        <span class="pill" id="resultPill">Result: 0</span>
+      </div>
+
+      <div class="visual-body">
+        <div>
+          <label for="arrayInput">height array</label>
+          <div class="array-input-row">
+            <input id="arrayInput" type="text" spellcheck="false" value="[0,2,0,3,1,0,1,3,2,1]" />
+            <button id="loadBtn" class="primary">Load array</button>
+          </div>
+          <div class="error" id="errorBox" role="status" aria-live="polite"></div>
+        </div>
+
+        <div class="chart-wrap">
+          <div class="baseline" aria-hidden="true"></div>
+          <div class="max-line left" id="leftMaxLine" aria-hidden="true"><span class="max-tag" id="leftMaxTag">LM=0</span></div>
+          <div class="max-line right" id="rightMaxLine" aria-hidden="true"><span class="max-tag" id="rightMaxTag">RM=0</span></div>
+          <div class="bars" id="bars" aria-label="Bar chart of heights and trapped water"></div>
+        </div>
+
+        <div class="legend" aria-label="Legend">
+          <span class="legend-item"><span class="swatch bar-swatch"></span>wall height</span>
+          <span class="legend-item"><span class="swatch water-swatch"></span>trapped water added so far</span>
+          <span class="legend-item"><span class="swatch left-swatch"></span>left pointer / left_max</span>
+          <span class="legend-item"><span class="swatch right-swatch"></span>right pointer / right_max</span>
+        </div>
+
+        <div class="controls" aria-label="Step controls">
+          <button id="resetBtn">Reset</button>
+          <button id="prevBtn">← Previous</button>
+          <button id="nextBtn" class="primary">Next →</button>
+          <button id="playBtn">Play</button>
+          <span class="step-progress" id="stepProgress">Step 1 / 1</span>
+          <span class="speed-wrap">
+            Speed
+            <input id="speedRange" type="range" min="1" max="5" value="3" aria-label="Playback speed" />
+          </span>
+        </div>
+      </div>
+    </section>
+
+    <aside class="side">
+      <section class="card code-card" aria-label="Source code">
+        <div class="card-header">
+          <h2 class="card-title">Code path</h2>
+          <span class="pill" id="linePill">line 1</span>
+        </div>
+        <pre class="code" id="codeBlock"></pre>
+      </section>
+
+      <section class="card" aria-label="Current state">
+        <div class="card-header">
+          <h2 class="card-title">State</h2>
+          <span class="pill" id="branchPill">initializing</span>
+        </div>
+        <div class="state-grid">
+          <div class="state-item"><div class="state-label">left</div><div class="state-value" id="leftVal">—</div></div>
+          <div class="state-item"><div class="state-label">right</div><div class="state-value" id="rightVal">—</div></div>
+          <div class="state-item"><div class="state-label">left_max</div><div class="state-value" id="leftMaxVal">—</div></div>
+          <div class="state-item"><div class="state-label">right_max</div><div class="state-value" id="rightMaxVal">—</div></div>
+          <div class="state-item"><div class="state-label">water added this step</div><div class="state-value" id="addedVal">—</div></div>
+          <div class="state-item"><div class="state-label">water_trapped</div><div class="state-value good" id="totalVal">0</div></div>
+        </div>
+        <div class="ledger">
+          <table aria-label="Water ledger by index">
+            <thead>
+              <tr><th>index</th><th>height</th><th>water</th></tr>
+            </thead>
+            <tbody id="ledgerBody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="card" aria-label="Explanation">
+        <div class="card-header">
+          <h2 class="card-title">What happened?</h2>
+          <span class="pill" id="actionPill">start</span>
+        </div>
+        <div class="explain">
+          <h2 id="explainTitle">Ready</h2>
+          <p id="explainText">Use Next to walk through each executed line.</p>
+          <div class="rule">
+            When <strong>left_max &lt; right_max</strong>, move <strong>left</strong>. Otherwise move <strong>right</strong>. The lower side is safe to settle because the opposite side already has a wall at least as tall.
+          </div>
+        </div>
+      </section>
+    </aside>
+  </main>
+
+  <script>
+    const codeLines = [
+      "def trap(height: List[int]) -> int:",
+      "    left,right = 0,len(height)-1",
+      "    left_max, right_max = height[left],height[right]",
+      "    water_trapped = 0",
+      "    while left<right:",
+      "        if left_max < right_max:",
+      "            left+=1",
+      "            left_max = max(left_max, height[left])",
+      "",
+      "            water_trapped += left_max - height[left]",
+      "        else:",
+      "            right -= 1",
+      "            right_max = max(right_max, height[right])",
+      "            water_trapped += right_max - height[right]",
+      "",
+      "    return water_trapped"
+    ];
+
+    const els = {
+      bars: document.getElementById("bars"),
+      codeBlock: document.getElementById("codeBlock"),
+      resultPill: document.getElementById("resultPill"),
+      linePill: document.getElementById("linePill"),
+      branchPill: document.getElementById("branchPill"),
+      actionPill: document.getElementById("actionPill"),
+      explainTitle: document.getElementById("explainTitle"),
+      explainText: document.getElementById("explainText"),
+      leftVal: document.getElementById("leftVal"),
+      rightVal: document.getElementById("rightVal"),
+      leftMaxVal: document.getElementById("leftMaxVal"),
+      rightMaxVal: document.getElementById("rightMaxVal"),
+      addedVal: document.getElementById("addedVal"),
+      totalVal: document.getElementById("totalVal"),
+      ledgerBody: document.getElementById("ledgerBody"),
+      stepProgress: document.getElementById("stepProgress"),
+      prevBtn: document.getElementById("prevBtn"),
+      nextBtn: document.getElementById("nextBtn"),
+      resetBtn: document.getElementById("resetBtn"),
+      playBtn: document.getElementById("playBtn"),
+      speedRange: document.getElementById("speedRange"),
+      arrayInput: document.getElementById("arrayInput"),
+      loadBtn: document.getElementById("loadBtn"),
+      errorBox: document.getElementById("errorBox"),
+      leftMaxLine: document.getElementById("leftMaxLine"),
+      rightMaxLine: document.getElementById("rightMaxLine"),
+      leftMaxTag: document.getElementById("leftMaxTag"),
+      rightMaxTag: document.getElementById("rightMaxTag")
+    };
+
+    let height = [0, 2, 0, 3, 1, 0, 1, 3, 2, 1];
+    let steps = [];
+    let current = 0;
+    let timer = null;
+
+    function fmt(value) {
+      return value === null || value === undefined ? "—" : String(value);
+    }
+
+    function renderCode() {
+      els.codeBlock.innerHTML = "";
+      codeLines.forEach((line, index) => {
+        const row = document.createElement("div");
+        row.className = "code-line";
+        row.dataset.line = index + 1;
+
+        const num = document.createElement("span");
+        num.className = "line-number";
+        num.textContent = index + 1;
+
+        const code = document.createElement("span");
+        code.textContent = line || " ";
+
+        row.appendChild(num);
+        row.appendChild(code);
+        els.codeBlock.appendChild(row);
+      });
+    }
+
+    function buildSteps(values) {
+      const n = values.length;
+      const localSteps = [];
+      const water = Array(n).fill(0);
+      let left = null;
+      let right = null;
+      let leftMax = null;
+      let rightMax = null;
+      let total = 0;
+
+      function snap(line, title, text, options = {}) {
+        localSteps.push({
+          line,
+          title,
+          text,
+          left,
+          right,
+          leftMax,
+          rightMax,
+          total,
+          water: [...water],
+          activeIndex: options.activeIndex ?? null,
+          added: options.added ?? null,
+          branch: options.branch ?? "initializing",
+          action: options.action ?? "step",
+          compare: options.compare ?? false
+        });
+      }
+
+      snap(1, "Call the function", `Input height is [${values.join(", ")}]. The function will scan inward from both ends.`, { action: "start" });
+
+      left = 0;
+      right = n - 1;
+      snap(2, "Initialize the two pointers", `left starts at index 0 and right starts at index ${n - 1}.`, { action: "initialize" });
+
+      leftMax = values[left];
+      rightMax = values[right];
+      snap(3, "Initialize the boundary maximums", `left_max becomes height[${left}] = ${leftMax}; right_max becomes height[${right}] = ${rightMax}.`, { action: "initialize" });
+
+      total = 0;
+      snap(4, "Initialize the answer", "water_trapped starts at 0.", { action: "initialize" });
+
+      while (left < right) {
+        snap(5, "Check the loop condition", `${left} < ${right}, so the loop continues.`, { compare: true, action: "loop" });
+
+        const moveLeft = leftMax < rightMax;
+        snap(
+          6,
+          "Compare the two boundary maximums",
+          `left_max (${leftMax}) < right_max (${rightMax}) is ${moveLeft}. ${moveLeft ? "The left side is the limiting side." : "The right side is the limiting side."}`,
+          { branch: moveLeft ? "move left" : "move right", action: "compare" }
+        );
+
+        if (moveLeft) {
+          left += 1;
+          snap(7, "Move left inward", `left moves to index ${left}. Now this index can be settled using left_max.`, {
+            activeIndex: left,
+            branch: "move left",
+            action: "move pointer"
+          });
+
+          const oldLeftMax = leftMax;
+          leftMax = Math.max(leftMax, values[left]);
+          snap(8, "Update left_max", `left_max = max(${oldLeftMax}, height[${left}] = ${values[left]}) = ${leftMax}.`, {
+            activeIndex: left,
+            branch: "move left",
+            action: "update max"
+          });
+
+          const added = leftMax - values[left];
+          total += added;
+          water[left] += added;
+          snap(10, "Add water at the left index", `At index ${left}, trapped water is left_max - height[${left}] = ${leftMax} - ${values[left]} = ${added}.`, {
+            activeIndex: left,
+            added,
+            branch: "move left",
+            action: "add water"
+          });
+        } else {
+          right -= 1;
+          snap(12, "Move right inward", `right moves to index ${right}. Now this index can be settled using right_max.`, {
+            activeIndex: right,
+            branch: "move right",
+            action: "move pointer"
+          });
+
+          const oldRightMax = rightMax;
+          rightMax = Math.max(rightMax, values[right]);
+          snap(13, "Update right_max", `right_max = max(${oldRightMax}, height[${right}] = ${values[right]}) = ${rightMax}.`, {
+            activeIndex: right,
+            branch: "move right",
+            action: "update max"
+          });
+
+          const added = rightMax - values[right];
+          total += added;
+          water[right] += added;
+          snap(14, "Add water at the right index", `At index ${right}, trapped water is right_max - height[${right}] = ${rightMax} - ${values[right]} = ${added}.`, {
+            activeIndex: right,
+            added,
+            branch: "move right",
+            action: "add water"
+          });
+        }
+      }
+
+      snap(5, "Check the loop condition", `${left} < ${right} is false, so the loop stops.`, { compare: true, action: "loop done" });
+      snap(16, "Return the answer", `The function returns water_trapped = ${total}.`, { action: "return" });
+      return localSteps;
+    }
+
+    function renderBars(step) {
+      const maxVisible = Math.max(1, ...height.map((h, i) => h + (step.water[i] || 0)), ...height);
+      const heightToPx = value => (value / maxVisible) * 240;
+
+      els.bars.innerHTML = "";
+
+      height.forEach((barHeight, index) => {
+        const waterAmount = step.water[index] || 0;
+        const col = document.createElement("div");
+        col.className = "column";
+        if (index === step.left) col.classList.add("pointer-left");
+        if (index === step.right) col.classList.add("pointer-right");
+        if (index === step.activeIndex) col.classList.add("active");
+
+        const badges = document.createElement("div");
+        badges.className = "pointer-badges";
+        if (index === step.left) {
+          const leftBadge = document.createElement("span");
+          leftBadge.className = "badge left";
+          leftBadge.textContent = "L";
+          badges.appendChild(leftBadge);
+        }
+        if (index === step.right) {
+          const rightBadge = document.createElement("span");
+          rightBadge.className = "badge right";
+          rightBadge.textContent = "R";
+          badges.appendChild(rightBadge);
+        }
+
+        const stack = document.createElement("div");
+        stack.className = "stack";
+
+        const water = document.createElement("div");
+        water.className = "water" + (waterAmount > 0 ? " has-water" : "");
+        water.style.bottom = `${heightToPx(barHeight)}px`;
+        water.style.height = `${heightToPx(waterAmount)}px`;
+
+        const bar = document.createElement("div");
+        bar.className = "bar";
+        bar.style.height = `${Math.max(2, heightToPx(barHeight))}px`;
+
+        const heightLabel = document.createElement("div");
+        heightLabel.className = "height-label";
+        heightLabel.textContent = barHeight;
+        heightLabel.style.setProperty("--label-bottom", `${Math.max(6, Math.min(heightToPx(barHeight) - 22, 210))}px`);
+
+        const waterLabel = document.createElement("div");
+        waterLabel.className = "water-label" + (waterAmount > 0 ? " visible" : "");
+        waterLabel.textContent = `+${waterAmount}`;
+        waterLabel.style.setProperty("--water-label-bottom", `${heightToPx(barHeight) + Math.max(10, heightToPx(waterAmount) / 2)}px`);
+
+        const indexLabel = document.createElement("div");
+        indexLabel.className = "index-label";
+        indexLabel.textContent = index;
+
+        stack.appendChild(water);
+        stack.appendChild(bar);
+        stack.appendChild(heightLabel);
+        stack.appendChild(waterLabel);
+        col.appendChild(badges);
+        col.appendChild(stack);
+        col.appendChild(indexLabel);
+        els.bars.appendChild(col);
+      });
+
+      const leftLineHeight = step.leftMax == null ? 0 : heightToPx(step.leftMax);
+      const rightLineHeight = step.rightMax == null ? 0 : heightToPx(step.rightMax);
+      els.leftMaxLine.style.setProperty("--max-y", `${leftLineHeight}px`);
+      els.rightMaxLine.style.setProperty("--max-y", `${rightLineHeight}px`);
+      els.leftMaxLine.style.opacity = step.leftMax == null ? "0" : "0.92";
+      els.rightMaxLine.style.opacity = step.rightMax == null ? "0" : "0.92";
+      els.leftMaxTag.textContent = `LM=${fmt(step.leftMax)}`;
+      els.rightMaxTag.textContent = `RM=${fmt(step.rightMax)}`;
+    }
+
+    function renderLedger(step) {
+      els.ledgerBody.innerHTML = "";
+      height.forEach((h, i) => {
+        const row = document.createElement("tr");
+        if (i === step.activeIndex) row.className = "active-row";
+        row.innerHTML = `<td>${i}</td><td>${h}</td><td>${step.water[i] || 0}</td>`;
+        els.ledgerBody.appendChild(row);
+      });
+    }
+
+    function renderStep() {
+      const step = steps[current];
+      if (!step) return;
+
+      document.querySelectorAll(".code-line").forEach(line => {
+        line.classList.toggle("active", Number(line.dataset.line) === step.line);
+      });
+
+      renderBars(step);
+      renderLedger(step);
+
+      els.resultPill.textContent = `Result: ${step.total}`;
+      els.linePill.textContent = `line ${step.line}`;
+      els.branchPill.textContent = step.branch;
+      els.actionPill.textContent = step.action;
+      els.explainTitle.textContent = step.title;
+      els.explainText.textContent = step.text;
+      els.leftVal.textContent = fmt(step.left);
+      els.rightVal.textContent = fmt(step.right);
+      els.leftMaxVal.textContent = fmt(step.leftMax);
+      els.rightMaxVal.textContent = fmt(step.rightMax);
+      els.addedVal.textContent = step.added === null ? "—" : `+${step.added}`;
+      els.totalVal.textContent = step.total;
+      els.stepProgress.textContent = `Step ${current + 1} / ${steps.length}`;
+
+      els.prevBtn.disabled = current === 0;
+      els.nextBtn.disabled = current === steps.length - 1;
+      els.playBtn.textContent = timer ? "Pause" : "Play";
+    }
+
+    function stopPlayback() {
+      if (timer) {
+        clearInterval(timer);
+        timer = null;
+        renderStep();
+      }
+    }
+
+    function nextStep() {
+      if (current < steps.length - 1) {
+        current += 1;
+        renderStep();
+      } else {
+        stopPlayback();
+      }
+    }
+
+    function prevStep() {
+      stopPlayback();
+      if (current > 0) {
+        current -= 1;
+        renderStep();
+      }
+    }
+
+    function reset() {
+      stopPlayback();
+      current = 0;
+      renderStep();
+    }
+
+    function play() {
+      if (timer) {
+        stopPlayback();
+        return;
+      }
+      if (current === steps.length - 1) current = 0;
+      renderStep();
+      const delay = 1550 - Number(els.speedRange.value) * 210;
+      timer = setInterval(nextStep, delay);
+      renderStep();
+    }
+
+    function parseArrayInput(raw) {
+      const trimmed = raw.trim();
+      let parsed;
+      if (trimmed.startsWith("[")) {
+        parsed = JSON.parse(trimmed);
+      } else {
+        parsed = trimmed.split(",").map(item => Number(item.trim()));
+      }
+
+      if (!Array.isArray(parsed) || parsed.length < 2) {
+        throw new Error("Enter at least two heights, for example [0,2,0,3].");
+      }
+      if (parsed.length > 22) {
+        throw new Error("Use 22 values or fewer so the chart stays readable.");
+      }
+      if (!parsed.every(Number.isFinite)) {
+        throw new Error("Every height must be a number.");
+      }
+      if (!parsed.every(value => Number.isInteger(value) && value >= 0)) {
+        throw new Error("Use non-negative integer heights only.");
+      }
+      return parsed;
+    }
+
+    function loadArray() {
+      try {
+        const parsed = parseArrayInput(els.arrayInput.value);
+        stopPlayback();
+        els.errorBox.textContent = "";
+        height = parsed;
+        steps = buildSteps(height);
+        current = 0;
+        renderStep();
+      } catch (err) {
+        els.errorBox.textContent = err.message || "The array could not be parsed.";
+      }
+    }
+
+    renderCode();
+    steps = buildSteps(height);
+    renderStep();
+
+    els.nextBtn.addEventListener("click", () => {
+      stopPlayback();
+      nextStep();
+    });
+    els.prevBtn.addEventListener("click", prevStep);
+    els.resetBtn.addEventListener("click", reset);
+    els.playBtn.addEventListener("click", play);
+    els.loadBtn.addEventListener("click", loadArray);
+    els.arrayInput.addEventListener("keydown", event => {
+      if (event.key === "Enter") loadArray();
+    });
+    els.speedRange.addEventListener("input", () => {
+      if (timer) {
+        stopPlayback();
+        play();
+      }
+    });
+
+    document.addEventListener("keydown", event => {
+      if (event.target === els.arrayInput) return;
+      if (event.key === "ArrowRight") {
+        event.preventDefault();
+        stopPlayback();
+        nextStep();
+      }
+      if (event.key === "ArrowLeft") {
+        event.preventDefault();
+        prevStep();
+      }
+      if (event.key === " ") {
+        event.preventDefault();
+        play();
+      }
+    });
+  </script>
+</body>
+</html>
