@@ -1,0 +1,1293 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Number of Islands — DFS Sink Visualizer</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --panel: #111827;
+      --panel-2: #1f2937;
+      --text: #e5e7eb;
+      --muted: #9ca3af;
+      --border: rgba(255,255,255,0.12);
+      --accent: #38bdf8;
+      --accent-2: #a78bfa;
+      --land: #22c55e;
+      --water: #0ea5e9;
+      --sunk: #64748b;
+      --current: #fbbf24;
+      --scan: #f97316;
+      --danger: #fb7185;
+      --good: #86efac;
+      --shadow: 0 18px 50px rgba(0,0,0,0.35);
+      --radius: 18px;
+      --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      --sans: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: var(--sans);
+      color: var(--text);
+      background:
+        radial-gradient(circle at top left, rgba(56,189,248,0.22), transparent 32rem),
+        radial-gradient(circle at 70% 12%, rgba(167,139,250,0.16), transparent 28rem),
+        linear-gradient(135deg, #020617, var(--bg));
+    }
+
+    header {
+      padding: 32px min(5vw, 54px) 18px;
+      display: grid;
+      gap: 12px;
+    }
+
+    header h1 {
+      margin: 0;
+      font-size: clamp(2rem, 5vw, 4.5rem);
+      line-height: 0.94;
+      letter-spacing: -0.06em;
+    }
+
+    header p {
+      margin: 0;
+      max-width: 930px;
+      color: var(--muted);
+      font-size: clamp(1rem, 2vw, 1.2rem);
+      line-height: 1.55;
+    }
+
+    .layout {
+      padding: 14px min(5vw, 54px) 44px;
+      display: grid;
+      grid-template-columns: minmax(340px, 1.08fr) minmax(360px, 0.92fr);
+      gap: 18px;
+      align-items: start;
+    }
+
+    @media (max-width: 1020px) {
+      .layout { grid-template-columns: 1fr; }
+    }
+
+    .card {
+      background: rgba(17,24,39,0.82);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+      backdrop-filter: blur(10px);
+    }
+
+    .card-header {
+      padding: 16px 18px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: center;
+      background: rgba(255,255,255,0.035);
+    }
+
+    .card-header h2,
+    .card-header h3 {
+      margin: 0;
+      font-size: 1rem;
+      letter-spacing: 0.01em;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      padding: 6px 10px;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      color: var(--muted);
+      font-size: 0.8rem;
+      white-space: nowrap;
+      background: rgba(255,255,255,0.04);
+    }
+
+    .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--accent);
+      box-shadow: 0 0 0 4px rgba(56,189,248,0.15);
+    }
+
+    .main-stage {
+      padding: 18px;
+      display: grid;
+      grid-template-columns: minmax(280px, 1fr) minmax(240px, 0.72fr);
+      gap: 16px;
+    }
+
+    @media (max-width: 760px) {
+      .main-stage { grid-template-columns: 1fr; }
+    }
+
+    .grid-wrap {
+      display: grid;
+      gap: 16px;
+      align-content: start;
+    }
+
+    .grid-board {
+      width: min(100%, 540px);
+      aspect-ratio: 5 / 4;
+      display: grid;
+      gap: 8px;
+      padding: 12px;
+      border-radius: 22px;
+      background: rgba(2,6,23,0.58);
+      border: 1px solid rgba(255,255,255,0.11);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .grid-board::before {
+      content: "";
+      position: absolute;
+      inset: -30%;
+      background: radial-gradient(circle, rgba(56,189,248,0.08), transparent 45%);
+      transform: translate(var(--glow-x, 0), var(--glow-y, 0));
+      pointer-events: none;
+    }
+
+    .cell {
+      position: relative;
+      display: grid;
+      place-items: center;
+      min-width: 44px;
+      min-height: 44px;
+      border-radius: 15px;
+      border: 1px solid rgba(255,255,255,0.14);
+      font-weight: 800;
+      font-size: clamp(1rem, 2vw, 1.35rem);
+      transition: transform 220ms ease, background 220ms ease, border-color 220ms ease, box-shadow 220ms ease, color 220ms ease;
+      isolation: isolate;
+    }
+
+    .cell.land {
+      background: linear-gradient(135deg, rgba(34,197,94,0.95), rgba(21,128,61,0.92));
+      color: #052e16;
+      box-shadow: inset 0 -12px 20px rgba(5,46,22,0.16);
+    }
+
+    .cell.water {
+      background: linear-gradient(135deg, rgba(14,165,233,0.86), rgba(29,78,216,0.72));
+      color: #dff8ff;
+    }
+
+    .cell.sunk {
+      background: linear-gradient(135deg, rgba(100,116,139,0.88), rgba(51,65,85,0.82));
+      color: #e2e8f0;
+      border-color: rgba(226,232,240,0.24);
+    }
+
+    .cell.scan {
+      outline: 3px solid var(--scan);
+      outline-offset: 2px;
+      transform: translateY(-3px);
+      box-shadow: 0 0 0 7px rgba(249,115,22,0.12), 0 18px 28px rgba(0,0,0,0.22);
+    }
+
+    .cell.active {
+      outline: 3px solid var(--current);
+      outline-offset: 2px;
+      transform: translateY(-5px) scale(1.03);
+      box-shadow: 0 0 0 8px rgba(251,191,36,0.15), 0 20px 30px rgba(0,0,0,0.25);
+    }
+
+    .cell.new-island::after {
+      content: "+1 island";
+      position: absolute;
+      top: -12px;
+      right: -9px;
+      padding: 3px 6px;
+      border-radius: 999px;
+      color: #1f2937;
+      background: var(--current);
+      font-size: 0.66rem;
+      font-weight: 900;
+      white-space: nowrap;
+      z-index: 2;
+    }
+
+    .cell .coord {
+      position: absolute;
+      bottom: 5px;
+      right: 7px;
+      font-size: 0.62rem;
+      font-weight: 700;
+      opacity: 0.55;
+    }
+
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .legend-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 7px 10px;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      color: var(--muted);
+      background: rgba(255,255,255,0.04);
+      font-size: 0.83rem;
+    }
+
+    .swatch {
+      width: 14px;
+      height: 14px;
+      border-radius: 5px;
+      border: 1px solid rgba(255,255,255,0.22);
+    }
+    .swatch.land { background: var(--land); }
+    .swatch.water { background: var(--water); }
+    .swatch.sunk { background: var(--sunk); }
+    .swatch.current { background: var(--current); }
+    .swatch.scan { background: var(--scan); }
+
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .stat {
+      min-height: 86px;
+      padding: 13px;
+      border-radius: 16px;
+      background: rgba(255,255,255,0.045);
+      border: 1px solid var(--border);
+    }
+
+    .stat b {
+      display: block;
+      color: var(--muted);
+      font-size: 0.78rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-bottom: 8px;
+    }
+
+    .stat span {
+      font-size: 1.75rem;
+      font-weight: 900;
+      line-height: 1;
+    }
+
+    .stat small {
+      display: block;
+      margin-top: 7px;
+      color: var(--muted);
+      line-height: 1.35;
+    }
+
+    .controls {
+      padding: 16px 18px 18px;
+      display: grid;
+      gap: 12px;
+      border-top: 1px solid var(--border);
+      background: rgba(255,255,255,0.025);
+    }
+
+    .buttons {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 9px;
+    }
+
+    button {
+      border: 0;
+      border-radius: 12px;
+      padding: 10px 13px;
+      color: #0f172a;
+      background: var(--accent);
+      font-weight: 800;
+      cursor: pointer;
+      transition: transform 160ms ease, opacity 160ms ease, background 160ms ease;
+    }
+
+    button:hover { transform: translateY(-1px); }
+    button:active { transform: translateY(0); }
+    button.secondary {
+      color: var(--text);
+      background: rgba(255,255,255,0.09);
+      border: 1px solid rgba(255,255,255,0.12);
+    }
+    button.ghost {
+      color: var(--text);
+      background: transparent;
+      border: 1px solid rgba(255,255,255,0.14);
+    }
+    button:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .range-row {
+      display: grid;
+      grid-template-columns: 84px 1fr auto;
+      gap: 12px;
+      align-items: center;
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+
+    input[type="range"] { width: 100%; accent-color: var(--accent); }
+
+    .progress-shell {
+      display: grid;
+      gap: 7px;
+    }
+
+    .progress-meta {
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      color: var(--muted);
+      font-size: 0.82rem;
+    }
+
+    .progress {
+      height: 10px;
+      border-radius: 999px;
+      overflow: hidden;
+      background: rgba(255,255,255,0.09);
+      border: 1px solid rgba(255,255,255,0.1);
+    }
+
+    .progress > div {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, var(--accent), var(--accent-2));
+      transition: width 180ms ease;
+    }
+
+    .narration {
+      padding: 16px 18px 18px;
+      display: grid;
+      gap: 13px;
+    }
+
+    .narration h3 {
+      margin: 0;
+      font-size: 1.2rem;
+      line-height: 1.25;
+    }
+
+    .narration p {
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.55;
+    }
+
+    .explain-box {
+      border-radius: 16px;
+      padding: 13px;
+      background: rgba(56,189,248,0.08);
+      border: 1px solid rgba(56,189,248,0.2);
+      color: #dbeafe;
+      line-height: 1.45;
+    }
+
+    .call-stack {
+      display: grid;
+      gap: 8px;
+      max-height: 310px;
+      overflow: auto;
+      padding-right: 3px;
+    }
+
+    .stack-item {
+      border: 1px solid rgba(255,255,255,0.13);
+      border-radius: 12px;
+      padding: 9px 10px;
+      background: rgba(255,255,255,0.055);
+      font-family: var(--mono);
+      font-size: 0.86rem;
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .stack-item.top {
+      border-color: rgba(251,191,36,0.55);
+      box-shadow: 0 0 0 4px rgba(251,191,36,0.07);
+    }
+
+    .stack-empty {
+      padding: 12px;
+      border-radius: 12px;
+      background: rgba(255,255,255,0.04);
+      border: 1px dashed rgba(255,255,255,0.14);
+      color: var(--muted);
+      line-height: 1.45;
+    }
+
+    .code-card { display: grid; }
+
+    .code-wrap {
+      max-height: 595px;
+      overflow: auto;
+      background: #020617;
+    }
+
+    .code-line {
+      display: grid;
+      grid-template-columns: 42px 1fr;
+      gap: 12px;
+      min-height: 27px;
+      align-items: center;
+      padding: 0 14px 0 0;
+      font-family: var(--mono);
+      font-size: 0.86rem;
+      line-height: 1.45;
+      color: #cbd5e1;
+      border-left: 3px solid transparent;
+      white-space: pre;
+    }
+
+    .code-line .num {
+      color: #64748b;
+      text-align: right;
+      user-select: none;
+    }
+
+    .code-line.active-line {
+      background: rgba(251,191,36,0.12);
+      border-left-color: var(--current);
+      color: #f8fafc;
+    }
+
+    .code-line.soft-line {
+      background: rgba(56,189,248,0.08);
+      border-left-color: rgba(56,189,248,0.55);
+    }
+
+    .notes {
+      padding: 16px 18px 18px;
+      display: grid;
+      gap: 12px;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+
+    .notes strong { color: var(--text); }
+
+    .mini-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    @media (max-width: 620px) {
+      .mini-grid { grid-template-columns: 1fr; }
+      .range-row { grid-template-columns: 1fr; }
+    }
+
+    .lesson {
+      border-radius: 14px;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid var(--border);
+      padding: 12px;
+    }
+
+    .lesson h4 {
+      margin: 0 0 7px;
+      color: var(--text);
+      font-size: 0.94rem;
+    }
+
+    .lesson p { margin: 0; }
+
+    .editor {
+      padding: 16px 18px 18px;
+      display: grid;
+      gap: 12px;
+      border-top: 1px solid var(--border);
+      background: rgba(255,255,255,0.025);
+    }
+
+    textarea {
+      width: 100%;
+      min-height: 118px;
+      resize: vertical;
+      border-radius: 14px;
+      border: 1px solid rgba(255,255,255,0.14);
+      background: rgba(2,6,23,0.75);
+      color: var(--text);
+      padding: 12px;
+      font-family: var(--mono);
+      font-size: 0.92rem;
+      line-height: 1.5;
+    }
+
+    textarea:focus {
+      outline: 2px solid rgba(56,189,248,0.48);
+      outline-offset: 2px;
+    }
+
+    .editor-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .hint {
+      color: var(--muted);
+      font-size: 0.85rem;
+      line-height: 1.45;
+    }
+
+    .error {
+      display: none;
+      padding: 10px 12px;
+      border-radius: 12px;
+      background: rgba(251,113,133,0.11);
+      border: 1px solid rgba(251,113,133,0.25);
+      color: #fecdd3;
+      font-size: 0.9rem;
+    }
+
+    .log {
+      max-height: 230px;
+      overflow: auto;
+      display: grid;
+      gap: 7px;
+      padding: 0 2px 0 0;
+    }
+
+    .log-item {
+      padding: 8px 10px;
+      border-radius: 11px;
+      border: 1px solid rgba(255,255,255,0.1);
+      background: rgba(255,255,255,0.04);
+      color: var(--muted);
+      font-size: 0.86rem;
+      line-height: 1.35;
+    }
+
+    .log-item.current-log {
+      color: var(--text);
+      border-color: rgba(56,189,248,0.35);
+      background: rgba(56,189,248,0.08);
+    }
+
+    .kbd {
+      display: inline-block;
+      min-width: 1.5em;
+      padding: 2px 6px;
+      border-radius: 6px;
+      border: 1px solid rgba(255,255,255,0.14);
+      background: rgba(255,255,255,0.06);
+      color: var(--text);
+      font-family: var(--mono);
+      font-size: 0.78rem;
+      text-align: center;
+    }
+
+    footer {
+      padding: 0 min(5vw, 54px) 34px;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Number of Islands<br>DFS Sink Visualizer</h1>
+    <p>
+      Walk through the exact idea in the Python solution: scan the grid, find the first unsunk <strong>1</strong>, count a new island, then recursively turn every connected <strong>1</strong> into <strong>0</strong> so it cannot be counted again.
+    </p>
+  </header>
+
+  <main class="layout">
+    <section class="card" aria-label="interactive visualization">
+      <div class="card-header">
+        <h2>Interactive walkthrough</h2>
+        <span class="pill"><span class="dot"></span><span id="modeLabel">Ready</span></span>
+      </div>
+
+      <div class="main-stage">
+        <div class="grid-wrap">
+          <div id="gridBoard" class="grid-board" aria-label="island grid"></div>
+          <div class="legend" aria-label="legend">
+            <span class="legend-item"><span class="swatch land"></span>Land: 1</span>
+            <span class="legend-item"><span class="swatch water"></span>Water: 0</span>
+            <span class="legend-item"><span class="swatch sunk"></span>Sunk land</span>
+            <span class="legend-item"><span class="swatch scan"></span>Scan pointer</span>
+            <span class="legend-item"><span class="swatch current"></span>DFS call</span>
+          </div>
+        </div>
+
+        <aside class="grid-wrap">
+          <div class="stats" aria-label="algorithm variables">
+            <div class="stat">
+              <b>island_count</b>
+              <span id="islandCount">0</span>
+              <small>Increments only when the scan sees a fresh <code>1</code>.</small>
+            </div>
+            <div class="stat">
+              <b>Step</b>
+              <span id="stepText">1 / 1</span>
+              <small>Use Next, Previous, or keyboard arrows.</small>
+            </div>
+            <div class="stat">
+              <b>Scan cell</b>
+              <span id="scanCell">—</span>
+              <small>Where the nested loops are currently looking.</small>
+            </div>
+            <div class="stat">
+              <b>Active call</b>
+              <span id="activeCall">—</span>
+              <small>Top of the recursive DFS stack.</small>
+            </div>
+          </div>
+
+          <div>
+            <div class="card-header" style="padding: 0 0 10px; border: 0; background: transparent;">
+              <h3>Recursion stack</h3>
+              <span class="pill" id="stackDepth">depth 0</span>
+            </div>
+            <div id="callStack" class="call-stack" aria-live="polite"></div>
+          </div>
+        </aside>
+      </div>
+
+      <div class="controls">
+        <div class="buttons">
+          <button id="prevBtn" class="secondary">← Previous</button>
+          <button id="nextBtn">Next →</button>
+          <button id="playBtn" class="secondary">Play</button>
+          <button id="resetBtn" class="ghost">Reset</button>
+          <button id="jumpEndBtn" class="ghost">Jump to result</button>
+        </div>
+
+        <div class="range-row">
+          <label for="speedRange">Speed</label>
+          <input id="speedRange" type="range" min="180" max="1500" value="700" step="40" />
+          <span id="speedLabel">0.70s</span>
+        </div>
+
+        <div class="progress-shell">
+          <div class="progress-meta">
+            <span id="progressLabel">Beginning</span>
+            <span id="totalStepsLabel">0 generated steps</span>
+          </div>
+          <div class="progress" aria-hidden="true"><div id="progressBar"></div></div>
+        </div>
+      </div>
+
+      <div class="narration">
+        <h3 id="stepTitle">Initialize</h3>
+        <p id="stepNarration">The visualizer is loading the first step.</p>
+        <div id="conceptBox" class="explain-box">
+          A connected component of land is one island. DFS visits every land cell in that component and mutates it to water.
+        </div>
+      </div>
+    </section>
+
+    <section class="card code-card" aria-label="code and explanation">
+      <div class="card-header">
+        <h2>Python code being visualized</h2>
+        <span class="pill">line highlight follows each step</span>
+      </div>
+      <div id="codeWrap" class="code-wrap"></div>
+
+      <div class="notes">
+        <div class="mini-grid">
+          <div class="lesson">
+            <h4>Core idea</h4>
+            <p>When the scan finds a <strong>1</strong>, that cell is the first visible piece of a new island. The answer increases by one, then DFS sinks the whole connected island.</p>
+          </div>
+          <div class="lesson">
+            <h4>Why mutation works</h4>
+            <p>Turning land into <strong>0</strong> acts like a visited set. Later scan steps see only water, so the same island is never counted twice.</p>
+          </div>
+          <div class="lesson">
+            <h4>Neighbor order</h4>
+            <p>The function explores <strong>up</strong>, then <strong>down</strong>, then <strong>left</strong>, then <strong>right</strong>. The stack panel shows that recursive order.</p>
+          </div>
+          <div class="lesson">
+            <h4>Complexity</h4>
+            <p>Every cell is inspected by the outer scan and each land cell is sunk once, so the runtime is <strong>O(rows × cols)</strong>.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="editor">
+        <div>
+          <h3 style="margin: 0 0 8px; font-size: 1rem;">Try another grid</h3>
+          <div class="hint">Use rows of <span class="kbd">0</span> and <span class="kbd">1</span>. Example: <code>11001</code>. Rows must be the same length.</div>
+        </div>
+        <textarea id="gridInput" spellcheck="false" aria-label="custom grid input">11001
+11001
+00100
+00011</textarea>
+        <div id="inputError" class="error"></div>
+        <div class="editor-row">
+          <div class="hint">Keyboard: <span class="kbd">←</span> previous, <span class="kbd">→</span> next, <span class="kbd">Space</span> play/pause.</div>
+          <div class="buttons">
+            <button id="loadGridBtn" class="secondary">Load grid</button>
+            <button id="sampleGridBtn" class="ghost">Restore sample</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="notes" style="border-top: 1px solid var(--border);">
+        <div class="card-header" style="padding: 0 0 10px; border: 0; background: transparent;">
+          <h3>Recent events</h3>
+          <span class="pill">current step centered</span>
+        </div>
+        <div id="eventLog" class="log"></div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    This learning tool is fully self-contained: no frameworks, no build step, and no external files. Open it in any modern browser.
+  </footer>
+
+  <script>
+    const sampleGridText = `11001\n11001\n00100\n00011`;
+
+    const codeLines = [
+      'class Solution:',
+      '    def numIslands(self, grid: List[List[str]]) -> int:',
+      '        ROWS,COLS = len(grid),len(grid[0])',
+      '        def rec_island(r,c):',
+      '            if r < 0 or r >= ROWS or c < 0 or c >= COLS:',
+      '                return',
+      '            if grid[r][c] == "0":',
+      '                return',
+      '            else:',
+      '                grid[r][c] = "0"',
+      '                rec_island(r-1, c)',
+      '                rec_island(r+1, c)',
+      '                rec_island(r, c-1)',
+      '                rec_island(r, c+1)',
+      '        ',
+      '        island_count = 0',
+      '        for r in range(ROWS):',
+      '            for c in range(COLS):',
+      '                if grid[r][c] == "1":',
+      '                    island_count +=1',
+      '                    rec_island(r,c)',
+      '        return island_count'
+    ];
+
+    const els = {
+      gridBoard: document.getElementById('gridBoard'),
+      islandCount: document.getElementById('islandCount'),
+      stepText: document.getElementById('stepText'),
+      scanCell: document.getElementById('scanCell'),
+      activeCall: document.getElementById('activeCall'),
+      callStack: document.getElementById('callStack'),
+      stackDepth: document.getElementById('stackDepth'),
+      prevBtn: document.getElementById('prevBtn'),
+      nextBtn: document.getElementById('nextBtn'),
+      playBtn: document.getElementById('playBtn'),
+      resetBtn: document.getElementById('resetBtn'),
+      jumpEndBtn: document.getElementById('jumpEndBtn'),
+      speedRange: document.getElementById('speedRange'),
+      speedLabel: document.getElementById('speedLabel'),
+      progressBar: document.getElementById('progressBar'),
+      progressLabel: document.getElementById('progressLabel'),
+      totalStepsLabel: document.getElementById('totalStepsLabel'),
+      stepTitle: document.getElementById('stepTitle'),
+      stepNarration: document.getElementById('stepNarration'),
+      conceptBox: document.getElementById('conceptBox'),
+      codeWrap: document.getElementById('codeWrap'),
+      modeLabel: document.getElementById('modeLabel'),
+      gridInput: document.getElementById('gridInput'),
+      inputError: document.getElementById('inputError'),
+      loadGridBtn: document.getElementById('loadGridBtn'),
+      sampleGridBtn: document.getElementById('sampleGridBtn'),
+      eventLog: document.getElementById('eventLog')
+    };
+
+    let steps = [];
+    let currentStep = 0;
+    let timer = null;
+    let originalGrid = parseGridText(sampleGridText).grid;
+    let sunkCells = new Set();
+
+    function cloneGrid(grid) {
+      return grid.map(row => row.slice());
+    }
+
+    function cellKey(r, c) {
+      return `${r},${c}`;
+    }
+
+    function formatCoord(coord) {
+      if (!coord) return '—';
+      const [r, c] = coord;
+      return `(${r},${c})`;
+    }
+
+    function parseGridText(text) {
+      const lines = text
+        .trim()
+        .split(/\n+/)
+        .map(line => line.trim().replace(/[\[\]",\s]/g, ''))
+        .filter(Boolean);
+
+      if (!lines.length) {
+        return { ok: false, error: 'Enter at least one row.' };
+      }
+
+      const width = lines[0].length;
+      if (!width) {
+        return { ok: false, error: 'Rows cannot be empty.' };
+      }
+
+      for (const line of lines) {
+        if (line.length !== width) {
+          return { ok: false, error: 'Every row must have the same length.' };
+        }
+        if (!/^[01]+$/.test(line)) {
+          return { ok: false, error: 'Only 0 and 1 are allowed.' };
+        }
+      }
+
+      if (lines.length > 9 || width > 10) {
+        return { ok: false, error: 'For a readable animation, keep the grid at 9 rows or fewer and 10 columns or fewer.' };
+      }
+
+      return { ok: true, grid: lines.map(line => line.split('')) };
+    }
+
+    function renderCode() {
+      els.codeWrap.innerHTML = codeLines.map((line, idx) => {
+        return `<div class="code-line" data-line="${idx + 1}"><span class="num">${idx + 1}</span><span>${escapeHtml(line) || '&nbsp;'}</span></div>`;
+      }).join('');
+    }
+
+    function escapeHtml(value) {
+      return String(value)
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#039;');
+    }
+
+    function generateSteps(inputGrid) {
+      const grid = cloneGrid(inputGrid);
+      const rows = grid.length;
+      const cols = grid[0].length;
+      const history = [];
+      const stack = [];
+      const events = [];
+      const newlySunk = new Set();
+      let islandCount = 0;
+      let scan = null;
+
+      function addEvent(message) {
+        events.push(message);
+        if (events.length > 300) events.shift();
+      }
+
+      function addStep({ title, narration, concept, lines = [], softLines = [], active = null, scanOverride, badge = '', log = null, newIsland = null }) {
+        if (log) addEvent(log);
+        const snapshot = {
+          title,
+          narration,
+          concept,
+          lines,
+          softLines,
+          active,
+          scan: scanOverride === undefined ? scan : scanOverride,
+          islandCount,
+          grid: cloneGrid(grid),
+          stack: stack.map(item => ({ ...item })),
+          badge,
+          newIsland,
+          sunk: Array.from(newlySunk),
+          events: events.slice()
+        };
+        history.push(snapshot);
+      }
+
+      addStep({
+        title: 'Initialize dimensions and counter',
+        narration: `ROWS = ${rows}, COLS = ${cols}. The algorithm starts with island_count = 0 and prepares to scan each cell from left to right, top to bottom.`,
+        concept: 'The outer loops guarantee every grid position gets a chance to start a DFS. DFS only starts from cells that are still land.',
+        lines: [3, 16],
+        log: `Initialize ROWS=${rows}, COLS=${cols}, island_count=0.`
+      });
+
+      function recIsland(r, c, fromLine = 21, direction = 'start') {
+        stack.push({ r, c, direction });
+        addStep({
+          title: `Call rec_island${formatCoord([r, c])}`,
+          narration: `A recursive call starts for row ${r}, column ${c}. First it checks whether this coordinate is outside the grid.`,
+          concept: 'Every recursive call follows the same guard pattern: boundary check first, water check second, then sink and explore neighbors.',
+          lines: [fromLine, 4, 5],
+          active: [r, c],
+          badge: direction,
+          log: `Call rec_island(${r}, ${c}) from ${direction}.`
+        });
+
+        if (r < 0 || r >= rows || c < 0 || c >= cols) {
+          addStep({
+            title: `Boundary return at ${formatCoord([r, c])}`,
+            narration: `(${r},${c}) is outside the grid, so this branch returns immediately.`,
+            concept: 'The boundary guard prevents invalid indexing and stops DFS at the edge of the grid.',
+            lines: [5, 6],
+            active: [r, c],
+            badge: 'out of bounds',
+            log: `Return: (${r}, ${c}) is out of bounds.`
+          });
+          stack.pop();
+          return;
+        }
+
+        addStep({
+          title: `Check cell ${formatCoord([r, c])}`,
+          narration: `The coordinate is inside the grid. Now the code checks whether grid[${r}][${c}] is water. Its current value is ${grid[r][c]}.`,
+          concept: 'A cell with value 0 is either original water or land that was already sunk by an earlier recursive call.',
+          lines: [7],
+          active: [r, c],
+          badge: `value ${grid[r][c]}`
+        });
+
+        if (grid[r][c] === '0') {
+          const wasSunk = newlySunk.has(cellKey(r, c));
+          addStep({
+            title: `Water return at ${formatCoord([r, c])}`,
+            narration: wasSunk
+              ? `grid[${r}][${c}] is already 0 because this land was sunk earlier, so this branch returns.`
+              : `grid[${r}][${c}] is original water, so this branch returns.`,
+            concept: 'This is why the mutation replaces a separate visited set: revisiting sunk land behaves exactly like hitting water.',
+            lines: [7, 8],
+            active: [r, c],
+            badge: 'water',
+            log: `Return: (${r}, ${c}) is water or already sunk.`
+          });
+          stack.pop();
+          return;
+        }
+
+        grid[r][c] = '0';
+        newlySunk.add(cellKey(r, c));
+        addStep({
+          title: `Sink land at ${formatCoord([r, c])}`,
+          narration: `grid[${r}][${c}] was 1, so DFS marks it as 0. This cell is now visited and cannot start another island count later.`,
+          concept: 'Sinking is the key move: it changes the grid in place to remember which land cells have already been included in the current island.',
+          lines: [9, 10],
+          active: [r, c],
+          badge: 'sunk',
+          log: `Sink land at (${r}, ${c}).`
+        });
+
+        const neighbors = [
+          { dr: -1, dc: 0, line: 11, label: 'up' },
+          { dr: 1, dc: 0, line: 12, label: 'down' },
+          { dr: 0, dc: -1, line: 13, label: 'left' },
+          { dr: 0, dc: 1, line: 14, label: 'right' }
+        ];
+
+        for (const n of neighbors) {
+          addStep({
+            title: `Explore ${n.label} from ${formatCoord([r, c])}`,
+            narration: `The code follows the ${n.label} recursive call next: rec_island(${r + n.dr}, ${c + n.dc}).`,
+            concept: 'DFS goes as deep as possible along one branch before returning to try the next direction.',
+            lines: [n.line],
+            active: [r, c],
+            badge: n.label,
+            log: `From (${r}, ${c}), explore ${n.label}.`
+          });
+          recIsland(r + n.dr, c + n.dc, n.line, n.label);
+        }
+
+        addStep({
+          title: `Finish cell ${formatCoord([r, c])}`,
+          narration: `All four directions from (${r},${c}) have returned. This call is complete, so control goes back to the previous stack frame.`,
+          concept: 'When a call finishes, every land cell reachable through that branch has already been sunk.',
+          lines: [14],
+          active: [r, c],
+          badge: 'return',
+          log: `Finished rec_island(${r}, ${c}).`
+        });
+        stack.pop();
+      }
+
+      for (let r = 0; r < rows; r++) {
+        addStep({
+          title: `Start row ${r}`,
+          narration: `The outer loop moves to row ${r}. The inner loop will scan each column in this row.`,
+          concept: 'The loops scan in row-major order: all columns in row 0, then all columns in row 1, and so on.',
+          lines: [17],
+          scanOverride: [r, 0],
+          log: `Start scanning row ${r}.`
+        });
+
+        for (let c = 0; c < cols; c++) {
+          scan = [r, c];
+          addStep({
+            title: `Scan cell ${formatCoord([r, c])}`,
+            narration: `The nested loops check grid[${r}][${c}], which is currently ${grid[r][c]}.`,
+            concept: 'Only a 1 can begin a new island. A 0 means water or land already handled by DFS.',
+            lines: [18, 19],
+            active: null,
+            log: `Scan (${r}, ${c}); value is ${grid[r][c]}.`
+          });
+
+          if (grid[r][c] === '1') {
+            islandCount += 1;
+            addStep({
+              title: `New island found at ${formatCoord([r, c])}`,
+              narration: `Because grid[${r}][${c}] is 1, this is the first unsunk cell of a new island. island_count becomes ${islandCount}.`,
+              concept: 'Counting happens before DFS. DFS then removes the rest of this island from future consideration.',
+              lines: [19, 20],
+              active: [r, c],
+              newIsland: [r, c],
+              badge: '+1 island',
+              log: `Found a new island at (${r}, ${c}); island_count=${islandCount}.`
+            });
+            recIsland(r, c, 21, 'new island root');
+          } else {
+            addStep({
+              title: `Skip cell ${formatCoord([r, c])}`,
+              narration: `grid[${r}][${c}] is 0, so it cannot start a new island. The scan moves on.`,
+              concept: 'A skipped 0 may be original water or a cell that was already sunk as part of a previous island.',
+              lines: [19],
+              active: [r, c],
+              badge: 'skip',
+              log: `Skip (${r}, ${c}).`
+            });
+          }
+        }
+      }
+
+      addStep({
+        title: `Return ${islandCount}`,
+        narration: `The full grid has been scanned. Every island was counted exactly once, and the final answer is ${islandCount}.`,
+        concept: 'The sample grid has four disconnected land components: top-left block, top-right vertical pair, middle single cell, and bottom-right pair.',
+        lines: [22],
+        active: null,
+        scanOverride: null,
+        badge: 'done',
+        log: `Return island_count=${islandCount}.`
+      });
+
+      return history;
+    }
+
+    function renderStep(index) {
+      const step = steps[index];
+      if (!step) return;
+
+      renderGrid(step);
+      renderStats(step, index);
+      renderStack(step.stack);
+      renderCodeHighlight(step.lines, step.softLines);
+      renderLog(step.events);
+
+      els.stepTitle.textContent = step.title;
+      els.stepNarration.textContent = step.narration;
+      els.conceptBox.textContent = step.concept;
+      els.modeLabel.textContent = step.badge || (timer ? 'Playing' : 'Paused');
+
+      const pct = steps.length <= 1 ? 0 : (index / (steps.length - 1)) * 100;
+      els.progressBar.style.width = `${pct}%`;
+      els.progressLabel.textContent = index === 0 ? 'Beginning' : index === steps.length - 1 ? 'Complete' : 'In progress';
+      els.totalStepsLabel.textContent = `${steps.length} generated steps`;
+
+      els.prevBtn.disabled = index === 0;
+      els.nextBtn.disabled = index === steps.length - 1;
+      els.jumpEndBtn.disabled = index === steps.length - 1;
+    }
+
+    function renderGrid(step) {
+      const rows = step.grid.length;
+      const cols = step.grid[0].length;
+      els.gridBoard.style.gridTemplateColumns = `repeat(${cols}, minmax(0, 1fr))`;
+      els.gridBoard.style.gridTemplateRows = `repeat(${rows}, minmax(0, 1fr))`;
+      els.gridBoard.style.aspectRatio = `${cols} / ${rows}`;
+
+      const activeKey = step.active ? cellKey(step.active[0], step.active[1]) : null;
+      const scanKey = step.scan ? cellKey(step.scan[0], step.scan[1]) : null;
+      const newIslandKey = step.newIsland ? cellKey(step.newIsland[0], step.newIsland[1]) : null;
+      const sunk = new Set(step.sunk || []);
+
+      els.gridBoard.innerHTML = '';
+      for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+          const key = cellKey(r, c);
+          const cell = document.createElement('div');
+          const isSunk = sunk.has(key);
+          const value = step.grid[r][c];
+          cell.className = 'cell ' + (value === '1' ? 'land' : isSunk ? 'sunk' : 'water');
+          if (key === activeKey) cell.classList.add('active');
+          if (key === scanKey) cell.classList.add('scan');
+          if (key === newIslandKey) cell.classList.add('new-island');
+          cell.setAttribute('aria-label', `row ${r}, column ${c}, value ${value}`);
+          cell.innerHTML = `<span>${value}</span><span class="coord">${r},${c}</span>`;
+          els.gridBoard.appendChild(cell);
+        }
+      }
+    }
+
+    function renderStats(step, index) {
+      els.islandCount.textContent = step.islandCount;
+      els.stepText.textContent = `${index + 1} / ${steps.length}`;
+      els.scanCell.textContent = formatCoord(step.scan);
+      const top = step.stack[step.stack.length - 1];
+      els.activeCall.textContent = top ? `(${top.r},${top.c})` : '—';
+      els.stackDepth.textContent = `depth ${step.stack.length}`;
+    }
+
+    function renderStack(stack) {
+      if (!stack.length) {
+        els.callStack.innerHTML = `<div class="stack-empty">No recursive calls are active. The algorithm is either scanning or finished.</div>`;
+        return;
+      }
+
+      els.callStack.innerHTML = stack
+        .map((item, idx) => {
+          const isTop = idx === stack.length - 1;
+          const label = item.r < 0 || item.c < 0 ? 'edge check' : item.direction;
+          return `<div class="stack-item ${isTop ? 'top' : ''}"><span>rec_island(${item.r}, ${item.c})</span><small>${escapeHtml(label)}</small></div>`;
+        })
+        .reverse()
+        .join('');
+    }
+
+    function renderCodeHighlight(lines, softLines = []) {
+      const active = new Set(lines || []);
+      const soft = new Set(softLines || []);
+      document.querySelectorAll('.code-line').forEach(line => {
+        const n = Number(line.dataset.line);
+        line.classList.toggle('active-line', active.has(n));
+        line.classList.toggle('soft-line', soft.has(n) && !active.has(n));
+      });
+
+      const firstActive = document.querySelector('.code-line.active-line');
+      if (firstActive) {
+        const top = firstActive.offsetTop - els.codeWrap.clientHeight / 3;
+        els.codeWrap.scrollTo({ top, behavior: 'smooth' });
+      }
+    }
+
+    function renderLog(events) {
+      const recent = events.slice(-9);
+      els.eventLog.innerHTML = recent.map((event, idx) => {
+        const current = idx === recent.length - 1;
+        return `<div class="log-item ${current ? 'current-log' : ''}">${escapeHtml(event)}</div>`;
+      }).join('') || `<div class="stack-empty">No events yet.</div>`;
+      els.eventLog.scrollTop = els.eventLog.scrollHeight;
+    }
+
+    function goTo(index) {
+      currentStep = Math.max(0, Math.min(index, steps.length - 1));
+      renderStep(currentStep);
+      if (currentStep === steps.length - 1) stopPlayback();
+    }
+
+    function nextStep() { goTo(currentStep + 1); }
+    function prevStep() { goTo(currentStep - 1); }
+
+    function getDelay() {
+      return Number(els.speedRange.value);
+    }
+
+    function startPlayback() {
+      if (timer || currentStep >= steps.length - 1) return;
+      els.playBtn.textContent = 'Pause';
+      els.modeLabel.textContent = 'Playing';
+      timer = setInterval(() => {
+        if (currentStep >= steps.length - 1) {
+          stopPlayback();
+        } else {
+          nextStep();
+        }
+      }, getDelay());
+    }
+
+    function stopPlayback() {
+      if (timer) clearInterval(timer);
+      timer = null;
+      els.playBtn.textContent = 'Play';
+      if (steps[currentStep]) els.modeLabel.textContent = steps[currentStep].badge || 'Paused';
+    }
+
+    function togglePlayback() {
+      if (timer) stopPlayback();
+      else startPlayback();
+    }
+
+    function loadGridFromText(text) {
+      const parsed = parseGridText(text);
+      if (!parsed.ok) {
+        els.inputError.textContent = parsed.error;
+        els.inputError.style.display = 'block';
+        return false;
+      }
+      stopPlayback();
+      els.inputError.style.display = 'none';
+      originalGrid = parsed.grid;
+      steps = generateSteps(originalGrid);
+      currentStep = 0;
+      renderStep(currentStep);
+      return true;
+    }
+
+    function updateSpeedLabel() {
+      els.speedLabel.textContent = `${(getDelay() / 1000).toFixed(2)}s`;
+      if (timer) {
+        stopPlayback();
+        startPlayback();
+      }
+    }
+
+    function wireEvents() {
+      els.prevBtn.addEventListener('click', prevStep);
+      els.nextBtn.addEventListener('click', nextStep);
+      els.playBtn.addEventListener('click', togglePlayback);
+      els.resetBtn.addEventListener('click', () => { stopPlayback(); goTo(0); });
+      els.jumpEndBtn.addEventListener('click', () => { stopPlayback(); goTo(steps.length - 1); });
+      els.speedRange.addEventListener('input', updateSpeedLabel);
+      els.loadGridBtn.addEventListener('click', () => loadGridFromText(els.gridInput.value));
+      els.sampleGridBtn.addEventListener('click', () => {
+        els.gridInput.value = sampleGridText;
+        loadGridFromText(sampleGridText);
+      });
+
+      document.addEventListener('keydown', (event) => {
+        const tag = document.activeElement && document.activeElement.tagName;
+        if (tag === 'TEXTAREA' || tag === 'INPUT') return;
+        if (event.key === 'ArrowRight') nextStep();
+        if (event.key === 'ArrowLeft') prevStep();
+        if (event.key === ' ') {
+          event.preventDefault();
+          togglePlayback();
+        }
+      });
+    }
+
+    renderCode();
+    wireEvents();
+    updateSpeedLabel();
+    loadGridFromText(sampleGridText);
+  </script>
+</body>
+</html>

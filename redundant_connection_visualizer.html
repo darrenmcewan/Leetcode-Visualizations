@@ -1,0 +1,1578 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Redundant Connection DFS Visualizer</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --panel: #111827;
+      --panel-2: #172033;
+      --muted: #94a3b8;
+      --text: #e5e7eb;
+      --text-strong: #f8fafc;
+      --accent: #38bdf8;
+      --accent-2: #a78bfa;
+      --good: #34d399;
+      --warn: #f59e0b;
+      --bad: #fb7185;
+      --line: #334155;
+      --chip: #1f2937;
+      --shadow: 0 18px 55px rgba(0, 0, 0, 0.35);
+      --radius: 18px;
+      --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      --sans: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      color: var(--text);
+      background:
+        radial-gradient(circle at top left, rgba(56, 189, 248, 0.18), transparent 32rem),
+        radial-gradient(circle at 80% 10%, rgba(167, 139, 250, 0.18), transparent 30rem),
+        var(--bg);
+      font-family: var(--sans);
+      line-height: 1.45;
+    }
+
+    .page {
+      width: min(1500px, calc(100% - 28px));
+      margin: 0 auto;
+      padding: 24px 0 36px;
+    }
+
+    header {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 18px;
+      align-items: end;
+      margin-bottom: 18px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(1.8rem, 3vw, 3.3rem);
+      line-height: 1;
+      letter-spacing: -0.055em;
+      color: var(--text-strong);
+    }
+
+    .subtitle {
+      max-width: 780px;
+      margin: 12px 0 0;
+      color: var(--muted);
+      font-size: 1rem;
+    }
+
+    .badge-row {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      border: 1px solid rgba(148, 163, 184, 0.25);
+      background: rgba(15, 23, 42, 0.68);
+      color: #cbd5e1;
+      border-radius: 999px;
+      padding: 7px 11px;
+      font-size: 0.82rem;
+      white-space: nowrap;
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: minmax(420px, 1.08fr) minmax(420px, 0.92fr);
+      gap: 16px;
+      align-items: start;
+    }
+
+    .panel {
+      background: linear-gradient(180deg, rgba(17, 24, 39, 0.96), rgba(15, 23, 42, 0.96));
+      border: 1px solid rgba(148, 163, 184, 0.17);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    .panel-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      border-bottom: 1px solid rgba(148, 163, 184, 0.15);
+      padding: 14px 16px;
+      background: rgba(255, 255, 255, 0.025);
+    }
+
+    .panel-title {
+      margin: 0;
+      color: var(--text-strong);
+      font-size: 1rem;
+      letter-spacing: -0.015em;
+    }
+
+    .panel-body {
+      padding: 16px;
+    }
+
+    .graph-wrap {
+      position: relative;
+      min-height: 470px;
+      border-radius: 16px;
+      background:
+        linear-gradient(rgba(148, 163, 184, 0.06) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(148, 163, 184, 0.06) 1px, transparent 1px),
+        rgba(2, 6, 23, 0.42);
+      background-size: 34px 34px;
+      border: 1px solid rgba(148, 163, 184, 0.12);
+      overflow: hidden;
+    }
+
+    svg {
+      width: 100%;
+      height: 470px;
+      display: block;
+    }
+
+    .edge-line {
+      stroke: #64748b;
+      stroke-width: 3;
+      stroke-linecap: round;
+      opacity: 0.9;
+      transition: stroke 180ms ease, opacity 180ms ease, stroke-width 180ms ease;
+    }
+
+    .edge-line.future {
+      stroke: #334155;
+      stroke-width: 2;
+      stroke-dasharray: 6 8;
+      opacity: 0.35;
+    }
+
+    .edge-line.current {
+      stroke: var(--accent);
+      stroke-width: 5;
+      opacity: 1;
+      filter: drop-shadow(0 0 8px rgba(56, 189, 248, 0.55));
+    }
+
+    .edge-line.active {
+      stroke: var(--warn);
+      stroke-width: 6;
+      opacity: 1;
+      filter: drop-shadow(0 0 8px rgba(245, 158, 11, 0.48));
+    }
+
+    .edge-line.cycle,
+    .edge-line.redundant {
+      stroke: var(--bad);
+      stroke-width: 7;
+      opacity: 1;
+      filter: drop-shadow(0 0 9px rgba(251, 113, 133, 0.62));
+    }
+
+    .edge-label {
+      font-family: var(--mono);
+      font-size: 11px;
+      fill: #cbd5e1;
+      paint-order: stroke;
+      stroke: rgba(2, 6, 23, 0.9);
+      stroke-width: 5px;
+      stroke-linejoin: round;
+      opacity: 0.82;
+      user-select: none;
+    }
+
+    .edge-label.future {
+      opacity: 0.35;
+    }
+
+    .node circle {
+      fill: #0f172a;
+      stroke: #64748b;
+      stroke-width: 3;
+      transition: fill 180ms ease, stroke 180ms ease, stroke-width 180ms ease, r 180ms ease;
+    }
+
+    .node text {
+      fill: var(--text-strong);
+      font-family: var(--mono);
+      font-size: 16px;
+      font-weight: 800;
+      text-anchor: middle;
+      dominant-baseline: middle;
+      pointer-events: none;
+      user-select: none;
+    }
+
+    .node.visited circle {
+      fill: rgba(52, 211, 153, 0.18);
+      stroke: var(--good);
+    }
+
+    .node.stack circle {
+      stroke: var(--accent-2);
+      stroke-width: 5;
+      filter: drop-shadow(0 0 8px rgba(167, 139, 250, 0.5));
+    }
+
+    .node.active circle {
+      fill: rgba(245, 158, 11, 0.22);
+      stroke: var(--warn);
+      stroke-width: 6;
+    }
+
+    .node.cycle circle {
+      fill: rgba(251, 113, 133, 0.24);
+      stroke: var(--bad);
+      stroke-width: 6;
+      filter: drop-shadow(0 0 10px rgba(251, 113, 133, 0.58));
+    }
+
+    .legend {
+      position: absolute;
+      top: 12px;
+      left: 12px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      max-width: calc(100% - 24px);
+      pointer-events: none;
+    }
+
+    .legend-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      background: rgba(15, 23, 42, 0.72);
+      border: 1px solid rgba(148, 163, 184, 0.18);
+      border-radius: 999px;
+      padding: 5px 8px;
+      color: #cbd5e1;
+      font-size: 0.78rem;
+      backdrop-filter: blur(8px);
+    }
+
+    .swatch {
+      width: 18px;
+      height: 4px;
+      border-radius: 99px;
+      background: #64748b;
+    }
+
+    .swatch.future { background: #334155; opacity: 0.55; }
+    .swatch.current { background: var(--accent); }
+    .swatch.active { background: var(--warn); }
+    .swatch.cycle { background: var(--bad); }
+    .dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: rgba(52, 211, 153, 0.38);
+      border: 2px solid var(--good);
+    }
+
+    .controls {
+      display: grid;
+      grid-template-columns: repeat(5, auto) 1fr auto;
+      gap: 10px;
+      align-items: center;
+      margin-top: 14px;
+    }
+
+    button,
+    .button-like {
+      border: 1px solid rgba(148, 163, 184, 0.23);
+      border-radius: 12px;
+      background: rgba(30, 41, 59, 0.88);
+      color: var(--text);
+      padding: 9px 12px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: transform 120ms ease, border-color 120ms ease, background 120ms ease;
+      font-family: var(--sans);
+      font-size: 0.9rem;
+    }
+
+    button:hover,
+    .button-like:hover {
+      transform: translateY(-1px);
+      border-color: rgba(56, 189, 248, 0.45);
+      background: rgba(51, 65, 85, 0.92);
+    }
+
+    button:active {
+      transform: translateY(0);
+    }
+
+    button:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .primary {
+      color: #07111f;
+      background: linear-gradient(135deg, #7dd3fc, #c4b5fd);
+      border-color: transparent;
+    }
+
+    .danger {
+      background: rgba(251, 113, 133, 0.12);
+      border-color: rgba(251, 113, 133, 0.42);
+      color: #fecdd3;
+    }
+
+    .range-wrap {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 10px;
+      align-items: center;
+      min-width: 170px;
+    }
+
+    input[type="range"] {
+      width: 100%;
+      accent-color: var(--accent);
+    }
+
+    .counter {
+      font-family: var(--mono);
+      color: var(--muted);
+      font-size: 0.86rem;
+      white-space: nowrap;
+    }
+
+    .two-col {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-top: 14px;
+    }
+
+    .card {
+      background: rgba(15, 23, 42, 0.62);
+      border: 1px solid rgba(148, 163, 184, 0.14);
+      border-radius: 16px;
+      padding: 13px;
+    }
+
+    .card h3 {
+      margin: 0 0 10px;
+      font-size: 0.95rem;
+      color: var(--text-strong);
+      letter-spacing: -0.012em;
+    }
+
+    .explanation {
+      min-height: 140px;
+    }
+
+    .step-kicker {
+      font-family: var(--mono);
+      font-size: 0.78rem;
+      color: var(--accent);
+      margin-bottom: 5px;
+    }
+
+    .step-title {
+      font-size: 1.22rem;
+      font-weight: 850;
+      color: var(--text-strong);
+      margin: 0 0 6px;
+      letter-spacing: -0.025em;
+    }
+
+    .step-detail,
+    .step-note {
+      color: #cbd5e1;
+      margin: 7px 0 0;
+    }
+
+    .step-note {
+      color: #a5b4fc;
+    }
+
+    .state-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+      margin-top: 12px;
+    }
+
+    .stat {
+      padding: 10px;
+      border-radius: 13px;
+      background: rgba(30, 41, 59, 0.72);
+      border: 1px solid rgba(148, 163, 184, 0.12);
+      min-width: 0;
+    }
+
+    .stat-label {
+      font-size: 0.75rem;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-bottom: 4px;
+    }
+
+    .stat-value {
+      color: var(--text-strong);
+      font-weight: 800;
+      font-family: var(--mono);
+      overflow-wrap: anywhere;
+    }
+
+    .code-box {
+      background: #020617;
+      border: 1px solid rgba(148, 163, 184, 0.18);
+      border-radius: 16px;
+      overflow: hidden;
+      max-height: 440px;
+      overflow-y: auto;
+    }
+
+    .code-line {
+      display: grid;
+      grid-template-columns: 42px 1fr;
+      gap: 10px;
+      padding: 2px 12px 2px 0;
+      font-family: var(--mono);
+      font-size: 0.86rem;
+      white-space: pre;
+      border-left: 4px solid transparent;
+    }
+
+    .code-line.highlight {
+      background: rgba(56, 189, 248, 0.13);
+      border-left-color: var(--accent);
+    }
+
+    .line-no {
+      color: #64748b;
+      text-align: right;
+      user-select: none;
+    }
+
+    .code-line.highlight .line-no,
+    .code-line.highlight code {
+      color: #e0f2fe;
+    }
+
+    .chips,
+    .visited-grid,
+    .edge-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 7px;
+    }
+
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 28px;
+      border-radius: 999px;
+      padding: 4px 9px;
+      background: var(--chip);
+      border: 1px solid rgba(148, 163, 184, 0.16);
+      color: #cbd5e1;
+      font-family: var(--mono);
+      font-size: 0.8rem;
+      white-space: nowrap;
+    }
+
+    .chip.visited {
+      color: #bbf7d0;
+      border-color: rgba(52, 211, 153, 0.42);
+      background: rgba(52, 211, 153, 0.12);
+    }
+
+    .chip.active {
+      color: #fed7aa;
+      border-color: rgba(245, 158, 11, 0.45);
+      background: rgba(245, 158, 11, 0.13);
+    }
+
+    .chip.cycle {
+      color: #fecdd3;
+      border-color: rgba(251, 113, 133, 0.5);
+      background: rgba(251, 113, 133, 0.14);
+    }
+
+    .stack-empty {
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+
+    .adj-list {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 7px;
+      max-height: 260px;
+      overflow: auto;
+      padding-right: 4px;
+    }
+
+    .adj-row {
+      display: grid;
+      grid-template-columns: 36px 1fr;
+      gap: 7px;
+      align-items: start;
+      font-family: var(--mono);
+      font-size: 0.82rem;
+      color: #cbd5e1;
+      background: rgba(2, 6, 23, 0.38);
+      border: 1px solid rgba(148, 163, 184, 0.1);
+      border-radius: 10px;
+      padding: 6px 7px;
+    }
+
+    .adj-node {
+      color: var(--accent);
+      font-weight: 850;
+    }
+
+    .edge-list button {
+      padding: 7px 9px;
+      font-family: var(--mono);
+      font-size: 0.8rem;
+      border-radius: 10px;
+      color: #cbd5e1;
+    }
+
+    .edge-list button.added {
+      border-color: rgba(52, 211, 153, 0.28);
+      background: rgba(52, 211, 153, 0.08);
+    }
+
+    .edge-list button.current {
+      border-color: rgba(56, 189, 248, 0.5);
+      background: rgba(56, 189, 248, 0.15);
+      color: #e0f2fe;
+    }
+
+    .edge-list button.future {
+      opacity: 0.48;
+    }
+
+    .edge-list button.redundant {
+      border-color: rgba(251, 113, 133, 0.62);
+      background: rgba(251, 113, 133, 0.18);
+      color: #fecdd3;
+    }
+
+    details {
+      margin-top: 14px;
+      border-radius: 16px;
+      border: 1px solid rgba(148, 163, 184, 0.14);
+      background: rgba(15, 23, 42, 0.55);
+      overflow: hidden;
+    }
+
+    summary {
+      cursor: pointer;
+      padding: 12px 13px;
+      font-weight: 800;
+      color: var(--text-strong);
+    }
+
+    details .inside {
+      padding: 0 13px 13px;
+    }
+
+    textarea {
+      width: 100%;
+      min-height: 110px;
+      resize: vertical;
+      border-radius: 13px;
+      border: 1px solid rgba(148, 163, 184, 0.24);
+      background: #020617;
+      color: #e5e7eb;
+      font-family: var(--mono);
+      padding: 11px;
+      outline: none;
+    }
+
+    textarea:focus {
+      border-color: rgba(56, 189, 248, 0.55);
+      box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.1);
+    }
+
+    .input-actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-top: 10px;
+    }
+
+    .input-error {
+      margin: 9px 0 0;
+      color: #fecdd3;
+      min-height: 1.25rem;
+      font-size: 0.88rem;
+    }
+
+    .learning-points {
+      display: grid;
+      gap: 9px;
+      color: #cbd5e1;
+      margin-top: 2px;
+    }
+
+    .learning-points div {
+      padding: 9px 10px;
+      border-radius: 12px;
+      background: rgba(30, 41, 59, 0.5);
+      border: 1px solid rgba(148, 163, 184, 0.1);
+    }
+
+    .kbd {
+      font-family: var(--mono);
+      border: 1px solid rgba(148, 163, 184, 0.27);
+      background: rgba(2, 6, 23, 0.45);
+      border-radius: 6px;
+      padding: 1px 5px;
+      color: #e2e8f0;
+      font-size: 0.78rem;
+    }
+
+    @media (max-width: 1100px) {
+      .layout {
+        grid-template-columns: 1fr;
+      }
+
+      header {
+        grid-template-columns: 1fr;
+      }
+
+      .badge-row {
+        justify-content: flex-start;
+      }
+    }
+
+    @media (max-width: 720px) {
+      .page {
+        width: min(100% - 16px, 1500px);
+        padding-top: 12px;
+      }
+
+      .controls,
+      .two-col,
+      .state-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .range-wrap {
+        grid-template-columns: 1fr;
+      }
+
+      .adj-list {
+        grid-template-columns: 1fr;
+      }
+
+      .graph-wrap,
+      svg {
+        min-height: 390px;
+        height: 390px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <header>
+      <div>
+        <h1>Redundant Connection DFS Visualizer</h1>
+        <p class="subtitle">Step through the exact Python approach: add one undirected edge, reset <code>visit</code>, run DFS, and return the first edge that makes DFS revisit a node.</p>
+      </div>
+      <div class="badge-row" aria-label="Tool details">
+        <span class="badge">Vanilla HTML</span>
+        <span class="badge">Vanilla CSS</span>
+        <span class="badge">Vanilla JS</span>
+      </div>
+    </header>
+
+    <section class="layout">
+      <div class="panel">
+        <div class="panel-header">
+          <h2 class="panel-title">Graph + Timeline</h2>
+          <span id="resultBadge" class="badge">Result: pending</span>
+        </div>
+        <div class="panel-body">
+          <div class="graph-wrap">
+            <div class="legend" aria-hidden="true">
+              <span class="legend-item"><span class="swatch future"></span>future</span>
+              <span class="legend-item"><span class="swatch"></span>added</span>
+              <span class="legend-item"><span class="swatch current"></span>current edge</span>
+              <span class="legend-item"><span class="swatch active"></span>DFS edge</span>
+              <span class="legend-item"><span class="swatch cycle"></span>cycle</span>
+              <span class="legend-item"><span class="dot"></span>visited</span>
+            </div>
+            <svg id="graph" role="img" aria-label="Graph visualization" viewBox="0 0 620 470"></svg>
+          </div>
+
+          <div class="controls" aria-label="Playback controls">
+            <button id="prevBtn" type="button">← Prev</button>
+            <button id="playBtn" type="button" class="primary">▶ Play</button>
+            <button id="nextBtn" type="button">Next →</button>
+            <button id="cycleBtn" type="button" class="danger">Cycle</button>
+            <button id="resultBtn" type="button">Result</button>
+            <div class="range-wrap">
+              <input id="stepRange" type="range" min="0" max="0" value="0" aria-label="Step slider" />
+              <span id="counter" class="counter">0 / 0</span>
+            </div>
+            <label class="counter" for="speedRange">Speed <input id="speedRange" type="range" min="250" max="1700" value="850" step="50" /></label>
+          </div>
+
+          <div class="two-col">
+            <div class="card">
+              <h3>Edges in order</h3>
+              <div id="edgeList" class="edge-list" aria-label="Input edges"></div>
+            </div>
+            <div class="card">
+              <h3>Learning checkpoints</h3>
+              <div class="learning-points">
+                <div><strong>1.</strong> The new edge is added before DFS runs.</div>
+                <div><strong>2.</strong> <code>visit</code> resets for each edge.</div>
+                <div><strong>3.</strong> The parent edge is skipped because the graph is undirected.</div>
+                <div><strong>4.</strong> Reaching an already visited node means the current edge created a cycle.</div>
+              </div>
+            </div>
+          </div>
+
+          <details>
+            <summary>Edit the edge input</summary>
+            <div class="inside">
+              <textarea id="edgeInput" spellcheck="false"></textarea>
+              <div class="input-actions">
+                <button id="rebuildBtn" type="button" class="primary">Rebuild trace</button>
+                <button id="restoreBtn" type="button">Restore sample</button>
+              </div>
+              <p id="inputError" class="input-error" aria-live="polite"></p>
+            </div>
+          </details>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-header">
+          <h2 class="panel-title">Code Trace + State</h2>
+          <span class="badge"><span class="kbd">←</span> <span class="kbd">→</span> <span class="kbd">Space</span></span>
+        </div>
+        <div class="panel-body">
+          <section class="card explanation" aria-live="polite">
+            <div id="stepKicker" class="step-kicker">Step</div>
+            <h3 id="stepTitle" class="step-title">Ready</h3>
+            <p id="stepDetail" class="step-detail"></p>
+            <p id="stepNote" class="step-note"></p>
+            <div class="state-grid">
+              <div class="stat">
+                <div class="stat-label">Current edge</div>
+                <div id="currentEdge" class="stat-value">—</div>
+              </div>
+              <div class="stat">
+                <div class="stat-label">Return value</div>
+                <div id="returnValue" class="stat-value">—</div>
+              </div>
+              <div class="stat">
+                <div class="stat-label">Final answer</div>
+                <div id="finalAnswer" class="stat-value">—</div>
+              </div>
+            </div>
+          </section>
+
+          <div class="two-col">
+            <section class="card">
+              <h3>DFS call stack</h3>
+              <div id="stackView" class="chips"></div>
+            </section>
+            <section class="card">
+              <h3>Visited array</h3>
+              <div id="visitedView" class="visited-grid"></div>
+            </section>
+          </div>
+
+          <section class="card" style="margin-top: 12px;">
+            <h3>Adjacency list snapshot</h3>
+            <div id="adjView" class="adj-list"></div>
+          </section>
+
+          <section class="card" style="margin-top: 12px;">
+            <h3>Python code</h3>
+            <div id="codeBox" class="code-box" aria-label="Python code with highlighted current line"></div>
+          </section>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    (() => {
+      const DEFAULT_EDGES = [[9,10],[5,8],[2,6],[1,5],[3,8],[4,9],[8,10],[4,10],[6,8],[7,9]];
+
+      const codeLines = [
+        "class Solution:",
+        "    def findRedundantConnection(self, edges: List[List[int]]) -> List[int]:",
+        "        n = len(edges)",
+        "        adj = [[] for _ in range(n+1)]",
+        "",
+        "        def dfs(node,parent):",
+        "            if visit[node]:",
+        "                return True",
+        "",
+        "            visit[node] = True",
+        "            for neighbor in adj[node]:",
+        "                if neighbor == parent:",
+        "                    continue",
+        "                if dfs(neighbor, node):",
+        "                    return True",
+        "            return False",
+        "",
+        "",
+        "        for u,v in edges:",
+        "            adj[u].append(v)",
+        "            adj[v].append(u)",
+        "",
+        "            visit = [False] * (n+1)",
+        "",
+        "            if dfs(u,-1):",
+        "                return [u,v]",
+        "        return []"
+      ];
+
+      const els = {
+        graph: document.getElementById("graph"),
+        resultBadge: document.getElementById("resultBadge"),
+        prevBtn: document.getElementById("prevBtn"),
+        playBtn: document.getElementById("playBtn"),
+        nextBtn: document.getElementById("nextBtn"),
+        cycleBtn: document.getElementById("cycleBtn"),
+        resultBtn: document.getElementById("resultBtn"),
+        stepRange: document.getElementById("stepRange"),
+        speedRange: document.getElementById("speedRange"),
+        counter: document.getElementById("counter"),
+        edgeList: document.getElementById("edgeList"),
+        edgeInput: document.getElementById("edgeInput"),
+        rebuildBtn: document.getElementById("rebuildBtn"),
+        restoreBtn: document.getElementById("restoreBtn"),
+        inputError: document.getElementById("inputError"),
+        stepKicker: document.getElementById("stepKicker"),
+        stepTitle: document.getElementById("stepTitle"),
+        stepDetail: document.getElementById("stepDetail"),
+        stepNote: document.getElementById("stepNote"),
+        currentEdge: document.getElementById("currentEdge"),
+        returnValue: document.getElementById("returnValue"),
+        finalAnswer: document.getElementById("finalAnswer"),
+        stackView: document.getElementById("stackView"),
+        visitedView: document.getElementById("visitedView"),
+        adjView: document.getElementById("adjView"),
+        codeBox: document.getElementById("codeBox")
+      };
+
+      let edges = cloneEdges(DEFAULT_EDGES);
+      let n = edges.length;
+      let steps = [];
+      let currentStep = 0;
+      let playTimer = null;
+
+      function cloneEdges(value) {
+        return value.map(edge => [edge[0], edge[1]]);
+      }
+
+      function edgeKey(a, b) {
+        const x = Number(a);
+        const y = Number(b);
+        return x < y ? `${x}-${y}` : `${y}-${x}`;
+      }
+
+      function keyFromEdge(edge) {
+        return edgeKey(edge[0], edge[1]);
+      }
+
+      function formatEdge(edge) {
+        return edge ? `[${edge[0]}, ${edge[1]}]` : "—";
+      }
+
+      function escapeHtml(value) {
+        return String(value)
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/\"/g, "&quot;")
+          .replace(/'/g, "&#039;");
+      }
+
+      function cloneAdj(adj) {
+        return adj.map(list => list.slice());
+      }
+
+      function getCycleEdgesFromPath(pathNodes) {
+        if (pathNodes.length < 2) return [];
+        const last = pathNodes[pathNodes.length - 1];
+        const first = pathNodes.findIndex((node, index) => index < pathNodes.length - 1 && node === last);
+        if (first === -1) return [];
+        const cycleNodes = pathNodes.slice(first);
+        const keys = [];
+        for (let i = 0; i < cycleNodes.length - 1; i += 1) {
+          keys.push(edgeKey(cycleNodes[i], cycleNodes[i + 1]));
+        }
+        return [...new Set(keys)];
+      }
+
+      function parseEdges(text) {
+        let parsed;
+        try {
+          parsed = JSON.parse(text);
+        } catch (error) {
+          throw new Error("Use JSON syntax like [[1,2],[2,3],[1,3]].");
+        }
+
+        if (!Array.isArray(parsed) || parsed.length === 0) {
+          throw new Error("The edge input must be a non-empty array.");
+        }
+
+        const clean = parsed.map((edge, index) => {
+          if (!Array.isArray(edge) || edge.length !== 2) {
+            throw new Error(`Edge #${index + 1} must contain exactly two node numbers.`);
+          }
+          const u = Number(edge[0]);
+          const v = Number(edge[1]);
+          if (!Number.isInteger(u) || !Number.isInteger(v) || u < 1 || v < 1) {
+            throw new Error(`Edge #${index + 1} must use positive integer node labels.`);
+          }
+          if (u === v) {
+            throw new Error(`Edge #${index + 1} is a self-loop. Use two different nodes.`);
+          }
+          return [u, v];
+        });
+
+        const nodeMax = Math.max(...clean.flat());
+        if (nodeMax > clean.length) {
+          throw new Error(`This exact code uses n = len(edges) = ${clean.length}, so node labels must be between 1 and ${clean.length}.`);
+        }
+
+        return clean;
+      }
+
+      function buildTrace(inputEdges) {
+        edges = cloneEdges(inputEdges);
+        n = edges.length;
+        const adj = Array.from({ length: n + 1 }, () => []);
+        let visit = Array(n + 1).fill(false);
+        let addedEdgeCount = 0;
+        let partialEdgeIndex = -1;
+        let currentEdgeIndex = -1;
+        let currentEdge = null;
+        let lastCycleEdges = [];
+        const trace = [];
+
+        function addStep({
+          lines = [],
+          title,
+          detail = "",
+          note = "",
+          kind = "normal",
+          stack = [],
+          activeNode = null,
+          activeNeighbor = null,
+          activeEdge = null,
+          cycleEdges = lastCycleEdges,
+          returnValue = null,
+          result = null,
+          currentEdgeOverride = null
+        }) {
+          trace.push({
+            lines,
+            title,
+            detail,
+            note,
+            kind,
+            edgeIndex: currentEdgeIndex,
+            currentEdge: currentEdgeOverride || currentEdge,
+            addedEdgeCount,
+            partialEdgeIndex,
+            adj: cloneAdj(adj),
+            visit: visit.slice(),
+            stack: stack.map(frame => ({ node: frame.node, parent: frame.parent })),
+            activeNode,
+            activeNeighbor,
+            activeEdge,
+            cycleEdges: cycleEdges ? cycleEdges.slice() : [],
+            returnValue,
+            result
+          });
+        }
+
+        function dfs(node, parent, path) {
+          const frame = { node, parent };
+          const stack = path.concat(frame);
+
+          addStep({
+            lines: [6],
+            title: `Enter dfs(${node}, ${parent})`,
+            detail: `The recursive call starts at node ${node}. The parent is ${parent}, so the edge back to ${parent} will be ignored.`,
+            note: "Each DFS call asks whether this connected component now contains a cycle.",
+            stack,
+            activeNode: node
+          });
+
+          addStep({
+            lines: [7],
+            title: `Check visit[${node}]`,
+            detail: `visit[${node}] is ${visit[node] ? "True" : "False"}.`,
+            note: visit[node]
+              ? "A True value here means DFS has reached a node that was already seen in this same search."
+              : "A False value means this node has not been explored in the current DFS run yet.",
+            stack,
+            activeNode: node
+          });
+
+          if (visit[node]) {
+            lastCycleEdges = getCycleEdgesFromPath(stack.map(frame => frame.node));
+            addStep({
+              lines: [8],
+              title: `Cycle detected at node ${node}`,
+              detail: `The stack has reached node ${node} again, so dfs(${node}, ${parent}) returns True.`,
+              note: "That True value bubbles back to the top-level if-statement, causing the current edge to be returned.",
+              kind: "cycle",
+              stack,
+              activeNode: node,
+              cycleEdges: lastCycleEdges,
+              returnValue: true
+            });
+            return { found: true, cycleEdges: lastCycleEdges.slice() };
+          }
+
+          visit[node] = true;
+          addStep({
+            lines: [10],
+            title: `Mark node ${node} as visited`,
+            detail: `The code sets visit[${node}] = True.`,
+            note: "Visited nodes are shown in green on the graph and in the array below.",
+            stack,
+            activeNode: node
+          });
+
+          for (const neighbor of adj[node]) {
+            const activeEdgeKey = edgeKey(node, neighbor);
+            addStep({
+              lines: [11],
+              title: `Inspect neighbor ${neighbor}`,
+              detail: `The loop is scanning adj[${node}] = [${adj[node].join(", ")}].`,
+              note: `The highlighted edge is ${node}—${neighbor}.`,
+              stack,
+              activeNode: node,
+              activeNeighbor: neighbor,
+              activeEdge: activeEdgeKey
+            });
+
+            addStep({
+              lines: [12],
+              title: `Check whether ${neighbor} is the parent`,
+              detail: `neighbor == parent is ${neighbor === parent ? "True" : "False"}.`,
+              note: "Because edges are undirected, every tree edge appears in both adjacency lists.",
+              stack,
+              activeNode: node,
+              activeNeighbor: neighbor,
+              activeEdge: activeEdgeKey
+            });
+
+            if (neighbor === parent) {
+              addStep({
+                lines: [13],
+                title: `Skip parent ${neighbor}`,
+                detail: `Node ${neighbor} is the parent of ${node}, so this back edge is expected.`,
+                note: "Without this skip, every undirected parent edge would look like a cycle.",
+                stack,
+                activeNode: node,
+                activeNeighbor: neighbor,
+                activeEdge: activeEdgeKey
+              });
+              continue;
+            }
+
+            addStep({
+              lines: [14],
+              title: `Recurse to dfs(${neighbor}, ${node})`,
+              detail: `The code explores neighbor ${neighbor} from node ${node}.`,
+              note: "If that recursive call returns True, the current call immediately returns True too.",
+              stack,
+              activeNode: node,
+              activeNeighbor: neighbor,
+              activeEdge: activeEdgeKey
+            });
+
+            const result = dfs(neighbor, node, stack);
+
+            addStep({
+              lines: [14],
+              title: `Back at node ${node}`,
+              detail: `dfs(${neighbor}, ${node}) returned ${result.found ? "True" : "False"}.`,
+              note: result.found
+                ? "A deeper call found a cycle, so the next line returns True."
+                : "No cycle was found through that neighbor, so the loop keeps scanning.",
+              stack,
+              activeNode: node,
+              activeNeighbor: neighbor,
+              activeEdge: activeEdgeKey,
+              cycleEdges: result.cycleEdges,
+              returnValue: result.found
+            });
+
+            if (result.found) {
+              addStep({
+                lines: [15],
+                title: `Return True from dfs(${node}, ${parent})`,
+                detail: "The cycle result is passed back up the recursion chain.",
+                note: "This is why the algorithm stops as soon as one repeated node is found.",
+                stack,
+                activeNode: node,
+                activeNeighbor: neighbor,
+                activeEdge: activeEdgeKey,
+                cycleEdges: result.cycleEdges,
+                returnValue: true
+              });
+              return result;
+            }
+          }
+
+          addStep({
+            lines: [16],
+            title: `Return False from dfs(${node}, ${parent})`,
+            detail: `All non-parent neighbors of node ${node} have been checked without finding a cycle.`,
+            note: "The DFS backtracks to the previous call.",
+            stack,
+            activeNode: node,
+            returnValue: false
+          });
+          return { found: false, cycleEdges: [] };
+        }
+
+        addStep({
+          lines: [3],
+          title: `Set n = len(edges) = ${n}`,
+          detail: "The code assumes node labels are in the range 1 through n.",
+          note: "For the sample input, n is 10 and the nodes are labeled 1 through 10.",
+          kind: "setup"
+        });
+
+        addStep({
+          lines: [4],
+          title: "Create an empty adjacency list",
+          detail: "adj starts as n + 1 empty lists so index 0 can be ignored.",
+          note: "The graph will be built incrementally, one edge at a time.",
+          kind: "setup"
+        });
+
+        let finalResult = null;
+        for (let i = 0; i < edges.length; i += 1) {
+          const [u, v] = edges[i];
+          currentEdgeIndex = i;
+          currentEdge = [u, v];
+          partialEdgeIndex = -1;
+          lastCycleEdges = [];
+
+          addStep({
+            lines: [19],
+            title: `Read edge #${i + 1}: ${formatEdge(currentEdge)}`,
+            detail: `The loop assigns u = ${u} and v = ${v}.`,
+            note: "The edge is not checked until after it is added to the graph.",
+            kind: "edge-start"
+          });
+
+          partialEdgeIndex = i;
+          adj[u].push(v);
+          addStep({
+            lines: [20],
+            title: `Add ${v} to adj[${u}]`,
+            detail: `The first direction of the undirected edge is stored: adj[${u}].append(${v}).`,
+            note: `adj[${u}] is now [${adj[u].join(", ")}].`,
+            kind: "add-edge"
+          });
+
+          adj[v].push(u);
+          addedEdgeCount = i + 1;
+          partialEdgeIndex = -1;
+          addStep({
+            lines: [21],
+            title: `Add ${u} to adj[${v}]`,
+            detail: `The reverse direction is stored: adj[${v}].append(${u}).`,
+            note: "Now the graph contains this full undirected edge.",
+            kind: "add-edge"
+          });
+
+          visit = Array(n + 1).fill(false);
+          addStep({
+            lines: [23],
+            title: "Reset visit for this edge",
+            detail: "A fresh DFS run starts after every new edge is added.",
+            note: "This implementation does not reuse visited information across edge checks.",
+            kind: "visit-reset"
+          });
+
+          addStep({
+            lines: [25],
+            title: `Call dfs(${u}, -1)` ,
+            detail: `The search starts from u = ${u}. The parent is -1 because the start node has no parent.`,
+            note: "If this DFS returns True, the current edge is redundant.",
+            kind: "dfs-start"
+          });
+
+          const result = dfs(u, -1, []);
+
+          addStep({
+            lines: [25],
+            title: `Evaluate dfs(${u}, -1)` ,
+            detail: `The DFS returned ${result.found ? "True" : "False"}.`,
+            note: result.found
+              ? `The edge ${formatEdge(currentEdge)} created a cycle.`
+              : `The edge ${formatEdge(currentEdge)} did not create a cycle, so the loop continues.`,
+            kind: result.found ? "cycle" : "no-cycle",
+            cycleEdges: result.cycleEdges,
+            returnValue: result.found
+          });
+
+          if (result.found) {
+            finalResult = [u, v];
+            addStep({
+              lines: [26],
+              title: `Return ${formatEdge(finalResult)}`,
+              detail: `The function stops here because ${formatEdge(finalResult)} is the first edge that creates a cycle.`,
+              note: "For this input, the cycle highlighted in red is 4—9—10—4.",
+              kind: "result",
+              cycleEdges: result.cycleEdges,
+              returnValue: true,
+              result: finalResult
+            });
+            break;
+          }
+        }
+
+        if (!finalResult) {
+          addStep({
+            lines: [27],
+            title: "Return []",
+            detail: "Every edge was processed without finding a cycle.",
+            note: "The sample input does find a cycle, so this line is not reached there.",
+            kind: "result",
+            returnValue: false,
+            result: []
+          });
+        }
+
+        return trace;
+      }
+
+      function getPositions() {
+        if (n === 10) {
+          return {
+            1: { x: 90, y: 280 },
+            2: { x: 95, y: 90 },
+            3: { x: 270, y: 110 },
+            4: { x: 520, y: 310 },
+            5: { x: 175, y: 245 },
+            6: { x: 185, y: 130 },
+            7: { x: 420, y: 405 },
+            8: { x: 300, y: 250 },
+            9: { x: 510, y: 140 },
+            10: { x: 420, y: 235 }
+          };
+        }
+
+        const positions = {};
+        const cx = 310;
+        const cy = 235;
+        const radius = Math.min(190, 85 + n * 10);
+        for (let node = 1; node <= n; node += 1) {
+          const angle = -Math.PI / 2 + ((node - 1) / n) * 2 * Math.PI;
+          positions[node] = {
+            x: cx + Math.cos(angle) * radius,
+            y: cy + Math.sin(angle) * radius
+          };
+        }
+        return positions;
+      }
+
+      function renderGraph(step) {
+        const svg = els.graph;
+        svg.innerHTML = "";
+        const positions = getPositions();
+        const cycleEdgeSet = new Set(step.cycleEdges || []);
+        const cycleNodeSet = new Set();
+        cycleEdgeSet.forEach(key => {
+          key.split("-").forEach(part => cycleNodeSet.add(Number(part)));
+        });
+
+        const edgeLayer = document.createElementNS("http://www.w3.org/2000/svg", "g");
+        const labelLayer = document.createElementNS("http://www.w3.org/2000/svg", "g");
+        const nodeLayer = document.createElementNS("http://www.w3.org/2000/svg", "g");
+        svg.append(edgeLayer, labelLayer, nodeLayer);
+
+        edges.forEach((edge, index) => {
+          const [u, v] = edge;
+          const from = positions[u];
+          const to = positions[v];
+          const key = keyFromEdge(edge);
+          if (!from || !to) return;
+
+          const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+          line.setAttribute("x1", from.x);
+          line.setAttribute("y1", from.y);
+          line.setAttribute("x2", to.x);
+          line.setAttribute("y2", to.y);
+          const classes = ["edge-line"];
+          const fullyAdded = index < step.addedEdgeCount;
+          const partiallyAdded = index === step.partialEdgeIndex;
+          if (!fullyAdded && !partiallyAdded) classes.push("future");
+          if (index === step.edgeIndex) classes.push("current");
+          if (key === step.activeEdge) classes.push("active");
+          if (cycleEdgeSet.has(key)) classes.push("cycle");
+          if (step.result && index === step.edgeIndex) classes.push("redundant");
+          line.setAttribute("class", classes.join(" "));
+
+          const title = document.createElementNS("http://www.w3.org/2000/svg", "title");
+          title.textContent = `Edge #${index + 1}: ${formatEdge(edge)}`;
+          line.appendChild(title);
+          edgeLayer.appendChild(line);
+
+          const label = document.createElementNS("http://www.w3.org/2000/svg", "text");
+          const dx = to.x - from.x;
+          const dy = to.y - from.y;
+          const length = Math.max(1, Math.hypot(dx, dy));
+          const offsetX = (-dy / length) * 10;
+          const offsetY = (dx / length) * 10;
+          label.setAttribute("x", (from.x + to.x) / 2 + offsetX);
+          label.setAttribute("y", (from.y + to.y) / 2 + offsetY);
+          label.setAttribute("class", `edge-label ${!fullyAdded && !partiallyAdded ? "future" : ""}`);
+          label.textContent = `#${index + 1}`;
+          labelLayer.appendChild(label);
+        });
+
+        const stackNodes = new Set((step.stack || []).map(frame => frame.node));
+        for (let node = 1; node <= n; node += 1) {
+          const position = positions[node];
+          if (!position) continue;
+          const group = document.createElementNS("http://www.w3.org/2000/svg", "g");
+          const classes = ["node"];
+          if (step.visit[node]) classes.push("visited");
+          if (stackNodes.has(node)) classes.push("stack");
+          if (node === step.activeNode) classes.push("active");
+          if (cycleNodeSet.has(node)) classes.push("cycle");
+          group.setAttribute("class", classes.join(" "));
+          group.setAttribute("transform", `translate(${position.x}, ${position.y})`);
+
+          const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+          const radius = node === step.activeNode || cycleNodeSet.has(node) ? 24 : 21;
+          circle.setAttribute("r", radius);
+          const title = document.createElementNS("http://www.w3.org/2000/svg", "title");
+          title.textContent = `Node ${node}${step.visit[node] ? " — visited" : ""}`;
+          circle.appendChild(title);
+
+          const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
+          text.textContent = node;
+          group.append(circle, text);
+          nodeLayer.appendChild(group);
+        }
+      }
+
+      function renderCode(step) {
+        els.codeBox.innerHTML = codeLines.map((line, index) => {
+          const lineNumber = index + 1;
+          const highlighted = step.lines.includes(lineNumber) ? "highlight" : "";
+          return `<div class="code-line ${highlighted}" data-line="${lineNumber}"><span class="line-no">${lineNumber}</span><code>${escapeHtml(line || " ")}</code></div>`;
+        }).join("");
+
+        const highlighted = els.codeBox.querySelector(".highlight");
+        if (highlighted) {
+          const box = els.codeBox.getBoundingClientRect();
+          const target = highlighted.getBoundingClientRect();
+          if (target.top < box.top || target.bottom > box.bottom) {
+            highlighted.scrollIntoView({ block: "center", behavior: "smooth" });
+          }
+        }
+      }
+
+      function renderState(step) {
+        els.stepKicker.textContent = `Step ${currentStep + 1} of ${steps.length}`;
+        els.stepTitle.textContent = step.title;
+        els.stepDetail.textContent = step.detail || "";
+        els.stepNote.textContent = step.note || "";
+        els.currentEdge.textContent = step.currentEdge ? `#${step.edgeIndex + 1} ${formatEdge(step.currentEdge)}` : "—";
+        els.returnValue.textContent = step.returnValue === null ? "—" : String(step.returnValue);
+        els.finalAnswer.textContent = step.result ? formatEdge(step.result) : "—";
+
+        const resultIndex = steps.findIndex(item => item.result);
+        const resultStep = resultIndex === -1 ? null : steps[resultIndex];
+        els.resultBadge.textContent = resultStep && currentStep >= resultIndex && resultStep.result.length
+          ? `Result: ${formatEdge(resultStep.result)}`
+          : "Result: pending";
+
+        if (step.stack.length === 0) {
+          els.stackView.innerHTML = `<span class="stack-empty">No active DFS call yet.</span>`;
+        } else {
+          els.stackView.innerHTML = step.stack.map((frame, index) => {
+            const isLast = index === step.stack.length - 1;
+            const cls = isLast ? "chip active" : "chip";
+            return `<span class="${cls}">dfs(${frame.node}, ${frame.parent})</span>`;
+          }).join("");
+        }
+
+        const cycleNodes = new Set();
+        (step.cycleEdges || []).forEach(key => key.split("-").forEach(part => cycleNodes.add(Number(part))));
+        els.visitedView.innerHTML = Array.from({ length: n }, (_, idx) => idx + 1).map(node => {
+          const classes = ["chip"];
+          if (step.visit[node]) classes.push("visited");
+          if (node === step.activeNode) classes.push("active");
+          if (cycleNodes.has(node)) classes.push("cycle");
+          return `<span class="${classes.join(" ")}">${node}: ${step.visit[node] ? "T" : "F"}</span>`;
+        }).join("");
+
+        els.adjView.innerHTML = Array.from({ length: n }, (_, idx) => idx + 1).map(node => {
+          const neighbors = step.adj[node] && step.adj[node].length ? step.adj[node].join(", ") : "∅";
+          return `<div class="adj-row"><span class="adj-node">${node}</span><span>[${escapeHtml(neighbors)}]</span></div>`;
+        }).join("");
+      }
+
+      function renderEdgeList(step) {
+        els.edgeList.innerHTML = edges.map((edge, index) => {
+          const classes = [];
+          const isCurrent = index === step.edgeIndex;
+          const isAdded = index < step.addedEdgeCount;
+          const isFuture = index > step.edgeIndex || (!isAdded && !isCurrent);
+          if (isAdded) classes.push("added");
+          if (isFuture) classes.push("future");
+          if (isCurrent) classes.push("current");
+          if (step.result && isCurrent) classes.push("redundant");
+          const label = `#${index + 1} ${formatEdge(edge)}`;
+          return `<button type="button" class="${classes.join(" ")}" data-edge-index="${index}" title="Jump to ${label}">${label}</button>`;
+        }).join("");
+      }
+
+      function render() {
+        const step = steps[currentStep];
+        if (!step) return;
+        renderGraph(step);
+        renderCode(step);
+        renderState(step);
+        renderEdgeList(step);
+
+        els.stepRange.max = String(Math.max(0, steps.length - 1));
+        els.stepRange.value = String(currentStep);
+        els.counter.textContent = `${currentStep + 1} / ${steps.length}`;
+        els.prevBtn.disabled = currentStep === 0;
+        els.nextBtn.disabled = currentStep === steps.length - 1;
+        els.resultBtn.disabled = !steps.some(step => step.result);
+        els.cycleBtn.disabled = !steps.some(step => step.kind === "cycle" && step.cycleEdges.length > 0);
+      }
+
+      function goTo(index) {
+        currentStep = Math.max(0, Math.min(steps.length - 1, index));
+        render();
+      }
+
+      function stopPlayback() {
+        if (playTimer) {
+          clearInterval(playTimer);
+          playTimer = null;
+        }
+        els.playBtn.textContent = "▶ Play";
+      }
+
+      function togglePlayback() {
+        if (playTimer) {
+          stopPlayback();
+          return;
+        }
+        els.playBtn.textContent = "⏸ Pause";
+        playTimer = setInterval(() => {
+          if (currentStep >= steps.length - 1) {
+            stopPlayback();
+            return;
+          }
+          goTo(currentStep + 1);
+        }, Number(els.speedRange.value));
+      }
+
+      function rebuild(inputEdges) {
+        stopPlayback();
+        steps = buildTrace(inputEdges);
+        currentStep = 0;
+        els.stepRange.max = String(Math.max(0, steps.length - 1));
+        render();
+      }
+
+      function jumpToFirst(predicate) {
+        const index = steps.findIndex(predicate);
+        if (index !== -1) goTo(index);
+      }
+
+      els.prevBtn.addEventListener("click", () => goTo(currentStep - 1));
+      els.nextBtn.addEventListener("click", () => goTo(currentStep + 1));
+      els.playBtn.addEventListener("click", togglePlayback);
+      els.stepRange.addEventListener("input", event => {
+        stopPlayback();
+        goTo(Number(event.target.value));
+      });
+      els.speedRange.addEventListener("input", () => {
+        if (playTimer) {
+          stopPlayback();
+          togglePlayback();
+        }
+      });
+      els.cycleBtn.addEventListener("click", () => jumpToFirst(step => step.kind === "cycle" && step.cycleEdges.length > 0));
+      els.resultBtn.addEventListener("click", () => jumpToFirst(step => step.result));
+      els.edgeList.addEventListener("click", event => {
+        const button = event.target.closest("button[data-edge-index]");
+        if (!button) return;
+        const target = Number(button.dataset.edgeIndex);
+        const index = steps.findIndex(step => step.edgeIndex === target && step.kind === "edge-start");
+        if (index !== -1) goTo(index);
+      });
+      els.rebuildBtn.addEventListener("click", () => {
+        try {
+          const parsed = parseEdges(els.edgeInput.value);
+          els.inputError.textContent = "";
+          rebuild(parsed);
+        } catch (error) {
+          els.inputError.textContent = error.message;
+        }
+      });
+      els.restoreBtn.addEventListener("click", () => {
+        els.edgeInput.value = JSON.stringify(DEFAULT_EDGES);
+        els.inputError.textContent = "";
+        rebuild(DEFAULT_EDGES);
+      });
+
+      document.addEventListener("keydown", event => {
+        const tag = document.activeElement && document.activeElement.tagName;
+        if (tag === "TEXTAREA" || tag === "INPUT") return;
+        if (event.key === "ArrowRight") {
+          event.preventDefault();
+          goTo(currentStep + 1);
+        } else if (event.key === "ArrowLeft") {
+          event.preventDefault();
+          goTo(currentStep - 1);
+        } else if (event.code === "Space") {
+          event.preventDefault();
+          togglePlayback();
+        }
+      });
+
+      els.edgeInput.value = JSON.stringify(DEFAULT_EDGES);
+      rebuild(DEFAULT_EDGES);
+    })();
+  </script>
+</body>
+</html>
